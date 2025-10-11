@@ -1,5 +1,4 @@
 
-# Define synthetic or real cases here for automated evaluation
 cases:
   - name: example_lagging
     file: datasets/example_lagging.csv

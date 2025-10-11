@@ -1,0 +1,64 @@
+
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lagwell 抽水試驗 (MVP)</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Lagwell 抽水試驗 (MVP)</h1>
+    <p>上傳 CSV 或貼資料、選模型，一鍵擬合並下載 PDF 報告。</p>
+  </header>
+  <main class="container">
+    <section class="card">
+      <h2>輸入資料</h2>
+      <div class="grid2">
+        <label>觀測半徑 r (m)<input id="r" type="number" step="0.01" value="30" /></label>
+        <label>抽水率 Q (m³/h)<input id="Q" type="number" step="0.01" value="120" /></label>
+        <label>模型
+          <select id="model">
+            <option value="lagging" selected>Lagging</option>
+            <option value="theis">Theis</option>
+            <option value="neuman">Neuman</option>
+          </select>
+        </label>
+        <label>信賴水準
+          <select id="conf">
+            <option value="0.95" selected>95%</option>
+            <option value="0.90">90%</option>
+          </select>
+        </label>
+      </div>
+      <div class="uploader">
+        <label>上傳 CSV（欄位：time_min, drawdown_m；可選 r_m, Q_m3ph）
+          <input id="csvFile" type="file" accept=".csv" />
+        </label>
+        <button id="loadExample" type="button">載入示例資料</button>
+      </div>
+      <textarea id="raw" rows="8" placeholder="或直接貼上 CSV 文字..."></textarea>
+      <div class="actions">
+        <button id="fitBtn">開始擬合</button>
+        <span id="status"></span>
+      </div>
+    </section>
+    <section class="card">
+      <h2>結果</h2>
+      <div id="result">
+        <div id="params"></div>
+        <div id="chart" class="chart"></div>
+        <div class="actions">
+          <button id="pdfBtn" disabled>下載 PDF 報告</button>
+        </div>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <small>用途限制：研究/前評估，非簽證文件。後端 API 預設 http://localhost:8000</small>
+  </footer>
+  <script src="./app.js"></script>
+</body>
+</html>

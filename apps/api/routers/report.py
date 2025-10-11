@@ -2,8 +2,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
-from pathlib import Path
-from jinja2 import Environment, FileSystemLoader, select_autoescape
 import base64, io
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
@@ -48,5 +46,4 @@ def make_report(req: ReportRequest):
     c.save()
     pdf_bytes = buffer.getvalue()
     buffer.close()
-
     return {"pdf_base64": base64.b64encode(pdf_bytes).decode("ascii")}

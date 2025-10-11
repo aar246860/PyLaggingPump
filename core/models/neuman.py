@@ -1,8 +1,4 @@
 
-"""Neuman model placeholder.
-
-Unconfined delayed response; for MVP, keep a placeholder curve.
-"""
 import numpy as np
 
 def drawdown_time_domain(t, T, S, r, Q):
