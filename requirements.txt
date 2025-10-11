@@ -1,0 +1,12 @@
+
+fastapi==0.115.0
+uvicorn==0.30.6
+pydantic==2.8.2
+numpy==1.26.4
+scipy==1.13.1
+matplotlib==3.8.4
+Jinja2==3.1.4
+# Optional for PDF: uncomment once your environment has system deps installed
+# WeasyPrint==61.2
+reportlab==4.2.2
+pycma==3.3.0

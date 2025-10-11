@@ -1,0 +1,9 @@
+
+# Define synthetic or real cases here for automated evaluation
+cases:
+  - name: example_lagging
+    file: datasets/example_lagging.csv
+    model: lagging
+    expected:
+      T: 1e-3
+      S: 1e-4

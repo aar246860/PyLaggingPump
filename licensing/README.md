@@ -1,0 +1,1 @@
+Placeholder for license validation (Lemon Squeezy/Payhip webhooks).
