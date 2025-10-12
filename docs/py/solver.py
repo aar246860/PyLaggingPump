@@ -552,6 +552,8 @@ def fit_with_ci(
 ):
     """Fit model and compute bootstrap confidence intervals."""
 
+    fit_j = bool(kwargs.get('fit_j', False))
+
     params, metrics, fitted = fit_model(
         times,
         draws,
@@ -562,6 +564,11 @@ def fit_with_ci(
         conf=conf,
         **kwargs,
     )
+
+    params_out = dict(params)
+    if not fit_j:
+        params_out.pop('j', None)
+
     ci = bootstrap_fit(
         times,
         draws,
@@ -571,7 +578,11 @@ def fit_with_ci(
         priors=priors,
         conf=conf,
         n_boot=n_boot,
-        base_fit=(params, fitted),
+        base_fit=(params_out, fitted),
         **kwargs,
     )['ci']
-    return params, metrics, fitted, ci
+
+    if not fit_j:
+        ci = {key: value for key, value in ci.items() if key in params_out}
+
+    return params_out, metrics, fitted, ci
