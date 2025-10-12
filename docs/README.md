@@ -12,7 +12,7 @@ uvicorn apps.api.main:app --reload
 
 Frontend:
 ```bash
-python -m http.server 5173 --directory webapp
+python -m http.server 5173 --directory docs
 # open http://localhost:5173/
 ```
 
