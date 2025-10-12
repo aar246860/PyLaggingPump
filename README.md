@@ -20,6 +20,8 @@ python -m http.server 5173 --directory docs
 # then open http://localhost:5173/
 ```
 
+- 前端會在 `localStorage` 中記住 API Base，亦可透過網址後加上 `?api=https://your-api.onrender.com` 或在頁面上的 **API Base URL** 欄位修改。
+
 ## 如何開啟網站
 
 在 GitHub Pages 設定頁面選擇 **Deploy from a branch**，並設定：

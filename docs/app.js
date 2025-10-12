@@ -1,7 +1,33 @@
 
-const API_BASE = localStorage.getItem('lagwell_api') || 'http://localhost:8000';
+const DEFAULT_API_BASE = 'http://localhost:8000';
+const params = new URLSearchParams(window.location.search);
+const queryApi = params.get('api');
+if (queryApi) {
+  localStorage.setItem('lagwell_api', queryApi);
+}
+let API_BASE = queryApi || localStorage.getItem('lagwell_api') || DEFAULT_API_BASE;
 
 const $ = (sel) => document.querySelector(sel);
+
+const apiDisplay = $('#apiDisplay');
+const apiBaseInput = $('#apiBase');
+
+function setApiBase(next) {
+  const sanitized = (next || '').trim() || DEFAULT_API_BASE;
+  API_BASE = sanitized;
+  localStorage.setItem('lagwell_api', sanitized);
+  if (apiDisplay) apiDisplay.textContent = sanitized;
+  if (apiBaseInput && apiBaseInput.value !== sanitized) {
+    apiBaseInput.value = sanitized;
+  }
+}
+
+setApiBase(API_BASE);
+
+if (apiBaseInput) {
+  apiBaseInput.addEventListener('change', (e) => setApiBase(e.target.value));
+  apiBaseInput.addEventListener('blur', (e) => setApiBase(e.target.value));
+}
 
 $('#loadExample').addEventListener('click', () => {
   const demo = `time_min,drawdown_m,r_m,Q_m3ph

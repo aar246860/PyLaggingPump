@@ -12,6 +12,9 @@ label { display:flex; flex-direction: column; gap:6px; font-size: 14px; color: v
 input, select, textarea, button { border-radius:10px; border:1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: var(--text); padding:10px 12px; }
 textarea { width:100%; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
 .uploader { display:flex; gap:12px; align-items:center; margin: 8px 0; }
+.api-base { display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; margin: 8px 0; }
+.api-base small { font-size: 12px; color: var(--muted); }
+.api-base label { flex:1; }
 .actions { display:flex; gap:12px; align-items:center; margin-top:10px; }
 button { cursor:pointer; background: linear-gradient(180deg, #6aaefc, #3c7df0); border:none; font-weight:600; }
 button[disabled] { opacity:.5; cursor:not-allowed; }
