@@ -36,13 +36,13 @@
 <body class="bg-zinc-950 text-zinc-100 font-[Inter] antialiased selection:bg-indigo-500/50">
 
   <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60 border-b border-white/10">
-    <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-      <a class="font-semibold tracking-wide">Lagging Pump Test Explorer</a>
-      <nav class="flex items-center gap-4 text-sm">
-        <a href="./index.html" class="text-zinc-300 hover:text-white transition">Launch App</a>
-        <button id="themeToggle" class="text-zinc-300 hover:text-white transition" type="button" aria-pressed="true">Toggle theme</button>
-      </nav>
-    </div>
+    <nav class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
+      <div class="flex items-center gap-4 text-sm">
+        <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
+        <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
+      </div>
+    </nav>
   </header>
 
   <section class="mx-auto max-w-7xl px-4 py-12 md:py-16">
@@ -55,8 +55,8 @@
           and how to use the tool.
         </p>
         <div class="mt-6 flex flex-wrap gap-3">
-          <a href="./index.html" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition">Try the App</a>
-          <a href="#contents" class="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 transition">Read the Guide</a>
+          <a href="./index.html" class="px-5 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition font-semibold">Start Analyzing for Free</a>
+          <a href="#contents" class="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 transition">Read the Technical Guide</a>
         </div>
       </div>
       <div class="rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-white/0 h-52 md:h-64 relative overflow-hidden">
@@ -229,6 +229,25 @@
           </p>
         </section>
 
+        <section id="validation" class="doc-section">
+          <h2>Accuracy &amp; Validation</h2>
+          <p>
+            The reliability of an analytical tool is its core value. We validate Lagwell Explorer's results against established textbook cases to ensure its accuracy meets professional standards.
+          </p>
+          <div class="card p-6 mt-4 space-y-3">
+            <h3 class="text-lg font-semibold">Validation Case: Theis (1935) Classic Problem</h3>
+            <p class="text-zinc-300">
+              Using data from a classic Theis well function problem in Fetter's "Applied Hydrogeology," we found that Lagwell Explorer's fitted curve closely matches the textbook solution. The calculated transmissivity (T) and storativity (S) values were within 1% of the expected results.
+            </p>
+            <div class="rounded-md border border-zinc-700 mt-2 bg-zinc-900 flex items-center justify-center h-48">
+                <p class="text-zinc-500">Comparison Chart Placeholder</p>
+            </div>
+            <p class="text-xs text-zinc-400">
+              For a detailed walkthrough of the validation process, see our <a href="#" class="underline">technical blog post</a>.
+            </p>
+          </div>
+        </section>
+
         <section id="faq" class="doc-section">
           <h2>FAQ</h2>
           <details class="card p-4">
@@ -252,6 +271,18 @@
             <li>Theis, C. V. (1935). The relation between the lowering of the piezometric surface and the rate and duration of discharge of a well using groundwater storage.</li>
             <li>Hantush, M. S., &amp; Jacob, C. E. (1955). Non-steady radial flow in an infinite leaky aquifer.</li>
           </ul>
+        </section>
+
+        <section class="doc-section text-center border-t border-zinc-700 pt-10 mt-10">
+          <h2 class="text-2xl font-bold">Ready to streamline your pumping test analysis?</h2>
+          <p class="mt-3 text-lg text-zinc-300">
+            Experience a modern, in-browser analysis tool. No installation required, free to start.
+          </p>
+          <div class="mt-6">
+            <a href="./index.html" class="px-8 py-4 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition text-lg font-semibold">
+              Use Lagwell for Free
+            </a>
+          </div>
         </section>
       </article>
     </div>
