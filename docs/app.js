@@ -1,126 +1,59 @@
 const $ = (sel) => document.querySelector(sel);
 
-const apiDisplay = $('#apiDisplay');
-const apiInput = $('#apiBaseInput');
-const apiStatus = $('#apiStatus');
-const saveBtn = $('#saveApiBase');
 const pyStatus = $('#pyStatus');
-let mixedContentWarning = false;
-
 let pyodideInstance = null;
-let pyodideReady = false;
+let solverLoaded = false;
 
 async function ensurePyodide() {
-  if (pyodideReady && pyodideInstance) {
+  if (pyodideInstance && solverLoaded) {
     return pyodideInstance;
   }
   if (typeof loadPyodide !== 'function') {
     throw new Error('Pyodide 未載入');
   }
-  try {
-    if (pyStatus) {
-      pyStatus.textContent = 'Python 核心載入中（首次啟動需一點時間）...';
-      pyStatus.classList.remove('ready');
-    }
-    pyodideInstance = await loadPyodide();
-    if (pyStatus) {
-      pyStatus.textContent = '載入科學套件（NumPy / SciPy）...';
-    }
-    await pyodideInstance.loadPackage(['numpy', 'scipy']);
-    if (pyStatus) {
-      pyStatus.textContent = '載入 Lagging 求解器...';
-    }
-    const code = await (await fetch('./py/solver.py')).text();
-    await pyodideInstance.runPythonAsync(code);
-    pyodideReady = true;
-    if (pyStatus) {
-      pyStatus.textContent = 'Python ready（瀏覽器端運算）';
-      pyStatus.classList.add('ready');
-    }
-    return pyodideInstance;
-  } catch (err) {
-    if (pyStatus) {
-      pyStatus.textContent = 'Python 載入失敗：' + err.message;
-      pyStatus.classList.remove('ready');
-    }
-    throw err;
-  }
-}
 
-function resolveApiBase() {
-  const url = new URL(window.location.href);
-  const p = url.searchParams.get('api');
-  if (p) {
-    localStorage.setItem('lagwell_api', p);
-  }
-  const stored = localStorage.getItem('lagwell_api');
-  return stored || '';
-}
-
-let API_BASE = resolveApiBase();
-
-function updateApiUi() {
-  if (apiDisplay) {
-    apiDisplay.textContent = API_BASE || '使用瀏覽器本地 Python';
-  }
-  if (apiInput && apiInput.value !== (API_BASE || '')) {
-    apiInput.value = API_BASE || '';
-  }
-}
-
-function warnMixed() {
-  if (!apiStatus) return;
-  mixedContentWarning = false;
-  if (!API_BASE) {
-    apiStatus.textContent = '💻 預設使用瀏覽器端 Python（Pyodide）';
-    return;
-  }
-  try {
-    const parsed = new URL(API_BASE);
-    if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
-      mixedContentWarning = true;
-      apiStatus.textContent = '⚠️ HTTPS 頁面連線 HTTP API 會被瀏覽器封鎖（Mixed Content）';
-    }
-  } catch (err) {
-    apiStatus.textContent = '';
-  }
-}
-
-async function testApi() {
-  warnMixed();
-  if (!apiStatus) return;
-  if (!API_BASE) {
-    return;
-  }
-  try {
-    const res = await fetch(`${API_BASE}/health`);
-    if (!res.ok) throw new Error(res.status);
-    apiStatus.textContent = `✅ 已連線：${API_BASE}`;
-  } catch (err) {
-    if (!mixedContentWarning) {
-      apiStatus.textContent = `❌ 無法連線：${API_BASE}（${err}）`;
+  if (!pyodideInstance) {
+    try {
+      if (pyStatus) {
+        pyStatus.textContent = 'Python 核心載入中（首次啟動需一點時間）...';
+        pyStatus.classList.remove('ready');
+      }
+      pyodideInstance = await loadPyodide();
+      if (pyStatus) {
+        pyStatus.textContent = '載入科學套件（NumPy / SciPy）...';
+      }
+      await pyodideInstance.loadPackage(['numpy', 'scipy']);
+    } catch (err) {
+      if (pyStatus) {
+        pyStatus.textContent = 'Python 載入失敗：' + err.message;
+        pyStatus.classList.remove('ready');
+      }
+      throw err;
     }
   }
-}
 
-updateApiUi();
-testApi();
-
-if (saveBtn) {
-  saveBtn.addEventListener('click', () => {
-    const value = (apiInput?.value || '').trim();
-    if (!value) {
-      localStorage.removeItem('lagwell_api');
-      API_BASE = '';
-      updateApiUi();
-      warnMixed();
-      return;
+  if (!solverLoaded) {
+    try {
+      if (pyStatus) {
+        pyStatus.textContent = '載入 Lagging 求解器...';
+      }
+      const code = await (await fetch('./py/solver.py')).text();
+      await pyodideInstance.runPythonAsync(code);
+      solverLoaded = true;
+      if (pyStatus) {
+        pyStatus.textContent = 'Python ready（瀏覽器端運算）';
+        pyStatus.classList.add('ready');
+      }
+    } catch (err) {
+      if (pyStatus) {
+        pyStatus.textContent = '載入求解器失敗：' + err.message;
+        pyStatus.classList.remove('ready');
+      }
+      throw err;
     }
-    localStorage.setItem('lagwell_api', value);
-    API_BASE = value;
-    updateApiUi();
-    testApi();
-  });
+  }
+
+  return pyodideInstance;
 }
 
 $('#loadExample').addEventListener('click', () => {
@@ -156,82 +89,62 @@ $('#fitBtn').addEventListener('click', async () => {
       throw new Error('沒有有效的觀測資料');
     }
 
-    let resultObj = null;
-    let mode = 'local';
-    let pyTimes = null;
-    let pyDraws = null;
+    $('#status').textContent = '初始化 Python（Pyodide）...';
+    const py = await ensurePyodide();
+    $('#status').textContent = '擬合中（瀏覽器端 Python）...';
 
+    const pyTimes = py.toPy(Array.from(times));
+    const pyDraws = py.toPy(Array.from(draws));
+    const pyModel = py.toPy(model);
+
+    let jsonStr = '';
     try {
-      $('#status').textContent = '初始化 Python（Pyodide）...';
-      const py = await ensurePyodide();
-      $('#status').textContent = '擬合中（本地 Python）...';
-      pyTimes = py.toPy(Array.from(times));
-      pyDraws = py.toPy(Array.from(draws));
       py.globals.set('times_js', pyTimes);
       py.globals.set('draws_js', pyDraws);
-      const python = `import json\nfrom js import times_js, draws_js\nimport numpy as np\ntimes = np.array(times_js, dtype=float)\ndraws = np.array(draws_js, dtype=float)\nparams, metrics, fitted = fit_model(times, draws, "${model}", ${_r}, ${_Q})\njson.dumps({"params": params, "metrics": metrics, "fitted": fitted})`;
-      const jsonStr = await py.runPythonAsync(python);
-      const parsedResult = JSON.parse(jsonStr);
-      resultObj = {
-        params: parsedResult.params || {},
-        metrics: parsedResult.metrics || {},
-        ci: {},
-        curves: {
-          observed: times.map((t, idx) => [t, draws[idx]]),
-          fitted: parsedResult.fitted || [],
-        },
-      };
-    } catch (localErr) {
-      console.error('Local fit failed, fallback to API if available', localErr);
-      if (pyStatus && !pyStatus.classList.contains('ready')) {
-        pyStatus.textContent = 'Python 本地計算失敗，可嘗試設定雲端 API';
-      }
-      if (!API_BASE) {
-        throw localErr;
-      }
-      mode = 'api';
-      $('#status').textContent = '本地運算失敗，改用雲端 API 擬合中...';
-      const payload = { r: _r, Q: _Q, data, model, conf };
-      const res = await fetch(`${API_BASE}/fit`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) throw new Error('Fit API error: ' + res.status);
-      const apiResult = await res.json();
-      resultObj = {
-        params: apiResult.params || {},
-        metrics: apiResult.metrics || {},
-        ci: apiResult.ci || {},
-        curves: apiResult.curves || {
-          observed: data.map((d) => [d.t, d.s]),
-          fitted: [],
-        },
-      };
-      if (!resultObj.curves?.observed?.length) {
-        resultObj.curves = resultObj.curves || {};
-        resultObj.curves.observed = data.map((d) => [d.t, d.s]);
-      }
+      py.globals.set('model_js', pyModel);
+      py.globals.set('r_js', _r);
+      py.globals.set('Q_js', _Q);
+
+      jsonStr = await py.runPythonAsync(`
+import json
+from js import times_js, draws_js, model_js, r_js, Q_js
+import numpy as np
+
+times = np.array(times_js, dtype=float)
+draws = np.array(draws_js, dtype=float)
+params, metrics, fitted = fit_model(times, draws, str(model_js), float(r_js), float(Q_js))
+json.dumps({"params": params, "metrics": metrics, "fitted": fitted})
+      `);
     } finally {
-      if (pyodideInstance?.globals) {
-        try { pyodideInstance.globals.delete('times_js'); } catch (_) {}
-        try { pyodideInstance.globals.delete('draws_js'); } catch (_) {}
-      }
+      ['times_js', 'draws_js', 'model_js', 'r_js', 'Q_js'].forEach((name) => {
+        try { py.globals.delete(name); } catch (_) {}
+      });
       if (pyTimes) pyTimes.destroy();
       if (pyDraws) pyDraws.destroy();
+      if (pyModel) pyModel.destroy();
     }
 
-    resultObj.model = model;
-    resultObj.mode = mode;
-    resultObj.r = _r;
-    resultObj.Q = _Q;
-    resultObj.conf = conf;
-    window._lastFit = resultObj;
+    const parsedResult = JSON.parse(jsonStr);
+    const resultObj = {
+      params: parsedResult.params || {},
+      metrics: parsedResult.metrics || {},
+      ci: {},
+      curves: {
+        observed: times.map((t, idx) => [t, draws[idx]]),
+        fitted: parsedResult.fitted || [],
+      },
+      model,
+      r: _r,
+      Q: _Q,
+      conf,
+      mode: 'pyodide',
+    };
 
+    window._lastFit = resultObj;
     renderParams(resultObj);
     renderChart(resultObj);
     $('#pdfBtn').disabled = false;
-    $('#status').textContent = mode === 'local' ? '完成（本地 Python）' : '完成（雲端 API）';
+    $('#status').textContent = '完成（瀏覽器端 Python）';
   } catch (err) {
     console.error(err);
     $('#status').textContent = '錯誤：' + err.message;
@@ -245,7 +158,7 @@ $('#pdfBtn').addEventListener('click', async () => {
     return;
   }
   const doc = new window.jspdf.jsPDF();
-  const { model, r, Q, params, metrics, mode, conf } = window._lastFit;
+  const { model, r, Q, params, metrics, conf } = window._lastFit;
   doc.setFontSize(18);
   doc.text('Lagwell 抽水試驗報告', 14, 20);
   doc.setFontSize(12);
@@ -253,7 +166,7 @@ $('#pdfBtn').addEventListener('click', async () => {
   doc.text(`半徑 r (m)：${formatNumber(r, 3)}`, 14, 40);
   doc.text(`抽水率 Q (m³/h)：${formatNumber(Q, 3)}`, 14, 48);
   doc.text(`信賴水準：${Math.round((conf || 0) * 100)}%`, 14, 56);
-  doc.text(`計算模式：${mode === 'local' ? '瀏覽器端 Python (Pyodide)' : `雲端 API (${API_BASE || '未設定'})`}`, 14, 64);
+  doc.text('計算模式：瀏覽器端 Python (Pyodide)', 14, 64);
 
   let y = 78;
   doc.setFontSize(14);
@@ -341,7 +254,7 @@ function renderParams(result) {
   if (typeof metrics.r2 === 'number') {
     metricsRows.push(`<div><strong>R²</strong></div><div>${fmtDec(metrics.r2)}</div>`);
   }
-  metricsRows.push(`<div><strong>模式</strong></div><div>${result.mode === 'local' ? '本地 Pyodide' : '雲端 API'}</div>`);
+  metricsRows.push(`<div><strong>運算環境</strong></div><div>Pyodide（瀏覽器端）</div>`);
   metricsRows.push(`<div><strong>信賴水準</strong></div><div>${Math.round((result.conf || 0) * 100)}%</div>`);
   const html = [...rows, ...metricsRows].join('');
   $('#params').innerHTML = html || '<em>尚無參數</em>';
