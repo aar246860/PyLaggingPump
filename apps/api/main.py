@@ -1,14 +1,25 @@
 
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from .routers import fit, report
 
 app = FastAPI(title="Lagwell API", version="0.1.0")
 
-# CORS: allow local dev (adjust before production)
+raw_origins = os.getenv("CORS_ALLOW_ORIGINS", "*")
+allow_origins = [
+    origin.strip()
+    for origin in raw_origins.split(",")
+    if origin.strip()
+]
+if not allow_origins or allow_origins == ["*"]:
+    allow_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://<我的帳號>.github.io"],
+    allow_origins=allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

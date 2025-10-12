@@ -39,12 +39,18 @@
         </label>
         <button id="loadExample" type="button">載入示例資料</button>
       </div>
-      <div class="api-base">
-        <label>API Base URL
-          <input id="apiBase" type="url" placeholder="https://example.onrender.com" />
-        </label>
-        <small>亦可於網址加上 <code>?api=</code> 查詢參數覆蓋設定。</small>
-      </div>
+      <details class="card" style="margin-top:12px;">
+        <summary>連線設定（API Base）</summary>
+        <div class="grid2" style="margin-top:8px;">
+          <label>API Base
+            <input id="apiBaseInput" type="text" placeholder="例如 https://your-backend.example.com" />
+          </label>
+          <div class="actions">
+            <button id="saveApiBase" type="button">儲存 API 位址</button>
+            <span id="apiStatus" style="font-size:12px;opacity:.8;"></span>
+          </div>
+        </div>
+      </details>
       <textarea id="raw" rows="8" placeholder="或直接貼上 CSV 文字..."></textarea>
       <div class="actions">
         <button id="fitBtn">開始擬合</button>

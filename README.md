@@ -20,7 +20,14 @@ python -m http.server 5173 --directory docs
 # then open http://localhost:5173/
 ```
 
-- 前端會在 `localStorage` 中記住 API Base，亦可透過網址後加上 `?api=https://your-api.onrender.com` 或在頁面上的 **API Base URL** 欄位修改。
+- 前端會在 `localStorage` 中記住 API Base；可於網址加上 `?api=https://your-api.example.com` 或透過頁面下方的「連線設定」區塊調整。
+
+## 在本機測試（HTTP ↔ HTTP）
+
+1. 啟動後端：`uvicorn apps.api.main:app --reload`
+2. 啟動前端靜態站台：`python -m http.server 5173 --directory docs`
+3. 開啟 `http://localhost:5173/`，預設 API Base 會填入 `http://localhost:8000`，`連線設定` 中應顯示 ✅ 已連線。
+4. 可上傳 CSV、貼上資料並執行擬合，下載 PDF 報告。
 
 ## 如何開啟網站
 
@@ -31,6 +38,13 @@ python -m http.server 5173 --directory docs
 - **Folder**：/docs
 
 儲存後，GitHub Pages 會從 `docs/` 目錄發佈靜態網站。
+
+## 在 GitHub Pages（HTTPS）測試
+
+1. 將 FastAPI 後端部署在支援 HTTPS 的服務（如 Render、Fly.io 等），並設定環境變數 `CORS_ALLOW_ORIGINS=https://<你的 GitHub 帳號>.github.io`。
+2. 開啟你的 Pages 網站，網址後面加上 `?api=https://你的https後端.example.com`，或在頁面「連線設定」輸入該 HTTPS API Base 後按「儲存」。
+3. 重新整理後，`連線設定` 中應顯示 ✅ 已連線；此時就能正常呼叫 `/fit` 與 `/report`。
+4. 若瀏覽器 Console 顯示 **Mixed Content** 或 `#apiStatus` 出現⚠️警告，代表在 HTTPS 頁面呼叫 HTTP 後端，此請求會被瀏覽器封鎖。請改用 HTTPS 後端或在本機以 HTTP 服務前端。
 
 ## Fit API (stub initially)
 POST /fit
