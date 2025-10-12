@@ -8,7 +8,7 @@ app = FastAPI(title="Lagwell API", version="0.1.0")
 # CORS: allow local dev (adjust before production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://<我的帳號>.github.io"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
