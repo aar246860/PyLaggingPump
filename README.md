@@ -15,10 +15,20 @@ uvicorn apps.api.main:app --reload
 
 Frontend (static):
 ```bash
-# serve the webapp at http://localhost:5173
-python -m http.server 5173 --directory webapp
+# serve the docs site at http://localhost:5173
+python -m http.server 5173 --directory docs
 # then open http://localhost:5173/
 ```
+
+## 如何開啟網站
+
+在 GitHub Pages 設定頁面選擇 **Deploy from a branch**，並設定：
+
+- **Source**：Deploy from a branch
+- **Branch**：main（或你使用的分支）
+- **Folder**：/docs
+
+儲存後，GitHub Pages 會從 `docs/` 目錄發佈靜態網站。
 
 ## Fit API (stub initially)
 POST /fit
