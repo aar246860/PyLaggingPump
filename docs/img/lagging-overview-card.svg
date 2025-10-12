@@ -1,0 +1,22 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="630" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a" />
+      <stop offset="1" stop-color="#312e81" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(850 150) rotate(90) scale(360 420)">
+      <stop stop-color="#6366f1" stop-opacity="0.6" />
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+  <g opacity="0.4" stroke="rgba(148, 163, 184, 0.35)" stroke-width="1.5">
+    <path d="M0 180 C300 120 900 240 1200 180" />
+    <path d="M0 300 C300 240 900 360 1200 300" />
+    <path d="M0 420 C300 360 900 480 1200 420" />
+  </g>
+  <text x="120" y="250" fill="#f8fafc" font-family="'Inter', 'Segoe UI', sans-serif" font-size="72" font-weight="600">Lagging Model Overview</text>
+  <text x="120" y="330" fill="#cbd5f5" font-family="'Inter', 'Segoe UI', sans-serif" font-size="32" font-weight="400">Hydrogeology documentation for the Pump Test Explorer</text>
+  <rect x="120" y="380" width="520" height="4" rx="2" fill="#6366f1" />
+</svg>

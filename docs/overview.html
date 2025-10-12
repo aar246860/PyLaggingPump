@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Lagging Model – Pump Test Explorer • Overview</title>
+  <meta name="description" content="Background, equations, assumptions, and usage guide for the Lagging Model drawdown tool." />
+  <meta property="og:title" content="Lagging Model Overview" />
+  <meta property="og:description" content="Understand the Lagging Model drawdown framework, parameters, and workflow before launching the Pump Test Explorer." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://aar246860.github.io/PyLaggingPump/overview.html" />
+  <meta property="og:image" content="https://aar246860.github.io/PyLaggingPump/docs/img/lagging-overview-card.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="theme-color" content="#18181b" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$','$'], ['\\(','\\)']],
+        displayMath: [['$$','$$'], ['\\[','\\]']],
+        tags: 'ams'
+      },
+      svg: {
+        fontCache: 'global',
+        linebreaks: { automatic: true, width: 'container' }
+      },
+      options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <link rel="stylesheet" href="./overview.css">
+  <script defer src="./overview.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-[Inter] antialiased selection:bg-indigo-500/50">
+
+  <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60 border-b border-white/10">
+    <div class="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
+      <a class="font-semibold tracking-wide">Lagging Pump Test Explorer</a>
+      <nav class="flex items-center gap-4 text-sm">
+        <a href="./index.html" class="text-zinc-300 hover:text-white transition">Launch App</a>
+        <button id="themeToggle" class="text-zinc-300 hover:text-white transition" type="button" aria-pressed="true">Toggle theme</button>
+      </nav>
+    </div>
+  </header>
+
+  <section class="mx-auto max-w-7xl px-4 py-12 md:py-16">
+    <div class="grid md:grid-cols-2 gap-8 items-center">
+      <div>
+        <h1 class="text-3xl md:text-5xl font-bold leading-tight">Lagging Model Overview</h1>
+        <p class="mt-4 text-zinc-300 text-lg">
+          A modern explanation of the <span class="font-semibold">Lagging</span> groundwater drawdown model—
+          background, equations, assumptions, comparisons to classical solutions, bootstrap uncertainty,
+          and how to use the tool.
+        </p>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a href="./index.html" class="px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition">Try the App</a>
+          <a href="#contents" class="px-4 py-2 rounded-xl border border-white/10 hover:bg-white/5 transition">Read the Guide</a>
+        </div>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-white/0 h-52 md:h-64 relative overflow-hidden">
+        <div class="absolute inset-0 opacity-40" aria-hidden="true">
+          <svg class="w-full h-full" viewBox="0 0 400 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="rg" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(200 120) rotate(90) scale(140 200)">
+                <stop stop-color="#6366f1" stop-opacity="0.7" />
+                <stop offset="1" stop-color="#a855f7" stop-opacity="0" />
+              </radialGradient>
+            </defs>
+            <rect width="400" height="240" fill="url(#rg)" />
+            <g stroke="rgba(255,255,255,0.25)" stroke-width="0.5">
+              <path d="M0 60 Q200 0 400 60" />
+              <path d="M0 120 Q200 60 400 120" />
+              <path d="M0 180 Q200 120 400 180" />
+              <path d="M0 240 Q200 180 400 240" />
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main id="contents" class="mx-auto max-w-7xl px-4 pb-20">
+    <div class="grid md:grid-cols-[260px_1fr] gap-8">
+      <aside id="toc" class="hidden md:block sticky top-[88px] self-start">
+        <nav class="text-sm leading-6">
+          <p class="text-zinc-400 mb-3 uppercase tracking-wider">Contents</p>
+          <ol class="space-y-2" id="tocList"></ol>
+        </nav>
+      </aside>
+
+      <article id="doc" class="prose prose-invert max-w-none">
+        <section id="background" class="doc-section">
+          <h2>Background</h2>
+          <p>
+            Classic diffusion-based well hydraulics (e.g., Theis) assume instantaneous propagation.
+            Field observations in fractured/leaky systems often show <em>delayed</em> responses that
+            classical models struggle to fit. The Lagging Model introduces phase lags in flux and
+            drawdown gradient to capture finite-speed and structural-interaction effects.
+          </p>
+          <p>
+            This documentation summarizes the conceptual framing used in the Lagging Pump Test Explorer,
+            helping analysts explain why additional lag terms produce markedly improved matches to field
+            time-drawdown signatures without abandoning diffusion physics altogether.
+          </p>
+        </section>
+
+        <section id="fundamentals" class="doc-section">
+          <h2>Fundamentals: Equations &amp; Parameters</h2>
+          <div class="card math-block p-6">
+            $$ S\,\frac{\partial s}{\partial t} + \tau_q S\,\frac{\partial^2 s}{\partial t^2}
+               = T\,\nabla_r^2 s + \tau_s T\,\frac{\partial}{\partial t}\big(\nabla_r^2 s\big) $$
+          </div>
+          <ul class="grid md:grid-cols-2 gap-4 mt-4">
+            <li><strong>$$T$$</strong> — Transmissivity ($$\mathrm{L}^2/\mathrm{T}$$)</li>
+            <li><strong>$$S$$</strong> — Storativity ($$-$$)</li>
+            <li><strong>$$\tau_q$$</strong> — Flux phase lag (time)</li>
+            <li><strong>$$\tau_s$$</strong> — Drawdown gradient lag (time)</li>
+          </ul>
+          <p class="mt-3 text-zinc-300">
+            When $$\tau_q = \tau_s = 0$$ this reduces to the classical diffusion equation (Theis).
+            Unequal lags reproduce early- and mid-time anomalies observed in fractured/leaky settings.
+          </p>
+          <div class="card p-6 mt-4 space-y-3">
+            <h3 class="text-lg font-semibold">Interpretation</h3>
+            <p class="text-zinc-300">
+              The lag terms introduce second-order time derivatives that produce a damped-wave response
+              when translated to Laplace space. Physically, they emulate finite propagation speeds and
+              momentum exchange between conduits and the surrounding matrix.
+            </p>
+            <p class="text-zinc-300">
+              Parameter identifiability improves when observation wells capture both early and late times.
+              Bootstrap resampling (see below) is used to quantify uncertainty in $$T, S, \tau_q, \tau_s$$.
+            </p>
+          </div>
+        </section>
+
+        <section id="differences" class="doc-section">
+          <h2>Differences vs. Theis / Hantush</h2>
+          <div class="grid md:grid-cols-2 gap-6">
+            <div class="card p-4">
+              <h3 class="text-lg font-semibold mb-2">Classical</h3>
+              <ul class="list-disc pl-5">
+                <li>Theis: instantaneous response, exponential-integral solution.</li>
+                <li>Hantush: leakage from aquitard causes late-time flattening.</li>
+                <li>Cooper-Jacob: semilog straight line assumes purely diffusive early response.</li>
+              </ul>
+            </div>
+            <div class="card p-4">
+              <h3 class="text-lg font-semibold mb-2">Lagging</h3>
+              <ul class="list-disc pl-5">
+                <li>Built-in phase lags capture finite propagation and structural delays.</li>
+                <li>Better early-/mid-time fits in fractured or leaky systems.</li>
+                <li>Reduces need for ad-hoc data trimming or manual smoothing before fitting.</li>
+              </ul>
+            </div>
+          </div>
+          <p class="mt-4 text-zinc-300">
+            Use the Lagging formulation when classical models require unrealistic transmissivity or
+            storativity to fit early-time drawdown, or when the recovery phase exhibits a hysteretic
+            response suggesting memory effects.
+          </p>
+        </section>
+
+        <section id="scenarios" class="doc-section">
+          <h2>Application Scenarios</h2>
+          <ul class="list-disc pl-5">
+            <li>Fractured aquifers with partial connectivity and delayed yield.</li>
+            <li>Leaky or multilayer systems (structural lag as an alternative to leakance).</li>
+            <li>High-rate or short-duration tests where inertia matters.</li>
+            <li>Sites with limited observation wells that still need early-time interpretation.</li>
+          </ul>
+          <p class="mt-3 text-zinc-300">
+            The Lagging Model is not a replacement for hydrogeologic judgment. Instead, use it as a
+            complementary diagnostic alongside standard flow-net and material-property data.
+          </p>
+        </section>
+
+        <section id="bootstrap" class="doc-section">
+          <h2>Bootstrap Confidence Intervals</h2>
+          <p>
+            The tool resamples residuals/data and refits the model to estimate parameter distributions,
+            reporting 95% intervals (e.g., $$[2.5\%, 97.5\%]$$ percentiles). The fitted curve can be
+            shown with a confidence band for visual uncertainty.
+          </p>
+          <div class="card p-6 mt-4 space-y-3">
+            <h3 class="text-lg font-semibold">Workflow</h3>
+            <ol class="list-decimal pl-5 space-y-2 text-zinc-300">
+              <li>Fit the base model to obtain residuals.</li>
+              <li>Generate bootstrap samples by resampling residuals with replacement.</li>
+              <li>Refit each sample to build parameter distributions.</li>
+              <li>Summarize intervals and update the shaded confidence band in the plot.</li>
+            </ol>
+          </div>
+        </section>
+
+        <section id="howto" class="doc-section">
+          <h2>How to Use the Tool</h2>
+          <ol class="list-decimal pl-5 space-y-2">
+            <li>Prepare CSV: <code>time, drawdown</code> (consistent units).</li>
+            <li>Load data / set initial values for $$T, S, \tau_q, \tau_s$$.</li>
+            <li>Run fit (optionally enable bootstrap for CIs).</li>
+            <li>Inspect parameters, intervals, and the plot; export PDF.</li>
+          </ol>
+          <p class="mt-3 text-zinc-300">
+            The interface mirrors standard well-test workflows. Advanced options let you pin parameters,
+            compare models, or share project links with colleagues via URL parameters.
+          </p>
+        </section>
+
+        <section id="faq" class="doc-section">
+          <h2>FAQ</h2>
+          <details class="card p-4">
+            <summary class="font-medium">What if the fit fails to converge?</summary>
+            <p class="mt-2 text-zinc-300">Try adjusting initial guesses or bounds; ensure units are consistent.</p>
+          </details>
+          <details class="card p-4 mt-3">
+            <summary class="font-medium">How should I interpret large $$\tau_q$$ values?</summary>
+            <p class="mt-2 text-zinc-300">Large lag indicates strong inertial or structural resistance. Check well construction and nearby boundaries before accepting the result.</p>
+          </details>
+          <details class="card p-4 mt-3">
+            <summary class="font-medium">Does the model support recovery tests?</summary>
+            <p class="mt-2 text-zinc-300">Yes, upload recovery data with signed drawdowns. The same lag terms apply; compare with Theis to highlight hysteresis.</p>
+          </details>
+        </section>
+
+        <section id="refs" class="doc-section">
+          <h2>References</h2>
+          <ul class="list-disc pl-5">
+            <li>Lin, Y.-C., &amp; Yeh, H.-D. (2017). A Lagging Model for Describing Drawdown... <a href="https://agupubs.onlinelibrary.wiley.com/doi/10.1002/2017WR021115" class="underline">DOI:10.1002/2017WR021115</a></li>
+            <li>Theis, C. V. (1935). The relation between the lowering of the piezometric surface and the rate and duration of discharge of a well using groundwater storage.</li>
+            <li>Hantush, M. S., &amp; Jacob, C. E. (1955). Non-steady radial flow in an infinite leaky aquifer.</li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="border-t border-white/10 py-6 text-center text-sm text-zinc-400">
+    <p><strong>Disclaimer</strong> — Research/educational tool. Not certified for field use.</p>
+  </footer>
+</body>
+</html>

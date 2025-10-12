@@ -1,0 +1,7 @@
+/* Cards and math container */
+.card { border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.02)); border-radius: 16px; }
+.math-block .mjx-container { max-width: 100%; }
+.doc-section { margin-top: 3.5rem; }
+.prose :where(h2){ margin-top: 2.5rem; scroll-margin-top: 96px; }
+.reveal { opacity: 0; transform: translateY(8px); transition: opacity .3s ease, transform .3s ease; }
+.reveal.visible { opacity: 1; transform: translateY(0); }
