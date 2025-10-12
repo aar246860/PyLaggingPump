@@ -1,0 +1,33 @@
+{
+  "theis": {
+    "id": "theis",
+    "name": "Theis (Confined Aquifer)",
+    "formula": "\\[ s(t,r)=\\frac{Q_w}{4\\pi T} W(u),\\quad u=\\frac{Sr^2}{4 T t},\\;W(u)=E_1(u) \\]",
+    "parameters": [
+      { "key": "T", "latex": "$$T$$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$$S$$", "units": "$$-$$", "desc": "Storage coefficient", "estimated": true },
+      { "key": "Q_w", "latex": "$$Q_w$$", "units": "$$\\mathrm{m}^3/\\mathrm{day}$$", "desc": "Pumping rate (input)", "estimated": false }
+    ],
+    "assumptions": [
+      "Homogeneous, isotropic, confined aquifer of infinite extent",
+      "Fully penetrating well, constant pumping rate",
+      "Negligible wellbore storage"
+    ]
+  },
+  "lagging": {
+    "id": "lagging",
+    "name": "Lagging Model (Lin & Yeh 2017)",
+    "formula": "\\[\\begin{aligned} s(t,r) &= \\mathcal{L}^{-1}\\{B(p)\\,K_0(k(p) r)\\},\\\\ k(p) &= \\sqrt{\\frac{p + j(1+p\\,\\tau_q)}{1+p\\,\\tau_s}} \\end{aligned}\\]",
+    "parameters": [
+      { "key": "T", "latex": "$$T$$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$$S$$", "units": "$$-$$", "desc": "Storativity", "estimated": true },
+      { "key": "tau_q", "latex": "$$\\tau_q$$", "units": "$$\\text{time}$$", "desc": "Flux phase lag", "estimated": true },
+      { "key": "tau_s", "latex": "$$\\tau_s$$", "units": "$$\\text{time}$$", "desc": "Drawdown gradient lag", "estimated": true },
+      { "key": "Q_w", "latex": "$$Q_w$$", "units": "$$\\mathrm{m}^3/\\mathrm{day}$$", "desc": "Pumping rate (input)", "estimated": false }
+    ],
+    "assumptions": [
+      "Phase-lagged response with skin and wellbore storage neglected",
+      "Use for early-time delayed yield analysis"
+    ]
+  }
+}

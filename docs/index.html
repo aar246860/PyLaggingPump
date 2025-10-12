@@ -1,66 +1,175 @@
-
 <!doctype html>
-<html lang="zh-Hant">
+<html class="dark" lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Lagwell 抽水試驗 (MVP)</title>
+  <title>Lagwell Pump Test Explorer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [
+          ['$', '$'],
+          ['\\(', '\\)']
+        ],
+        displayMath: [
+          ['$$', '$$'],
+          ['\\[', '\\]']
+        ],
+        tags: 'ams'
+      },
+      svg: {
+        fontCache: 'global',
+        linebreaks: {
+          automatic: true,
+          width: 'container'
+        }
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
-<body>
-  <header>
-    <h1>Lagwell 抽水試驗 (MVP)</h1>
-    <p>上傳 CSV 或貼資料、選模型，一鍵擬合並下載 PDF 報告（全程瀏覽器端計算）。</p>
-    <div id="pyStatus" class="py-status">Python 核心尚未載入</div>
-  </header>
-  <main class="container">
-    <section class="card">
-      <h2>輸入資料</h2>
-      <div class="grid2">
-        <label>觀測半徑 r (m)<input id="r" type="number" step="0.01" value="30" /></label>
-        <label>抽水率 Q (m³/h)<input id="Q" type="number" step="0.01" value="120" /></label>
-        <label>模型
-          <select id="model">
-            <option value="lagging" selected>Lagging</option>
-            <option value="theis">Theis</option>
-          </select>
-        </label>
-        <label>信賴水準
-          <select id="conf">
-            <option value="0.95" selected>95%</option>
-            <option value="0.90">90%</option>
-          </select>
-        </label>
-      </div>
-      <div class="uploader">
-        <label>上傳 CSV（欄位：time_min, drawdown_m；可選 r_m, Q_m3ph）
-          <input id="csvFile" type="file" accept=".csv" />
-        </label>
-        <button id="loadExample" type="button">載入示例資料</button>
-      </div>
-      <textarea id="raw" rows="8" placeholder="或直接貼上 CSV 文字..."></textarea>
-      <div class="actions">
-        <button id="fitBtn">開始擬合</button>
-        <span id="status"></span>
-      </div>
-    </section>
-    <section class="card">
-      <h2>結果</h2>
-      <div id="result">
-        <div id="params"></div>
-        <div id="chart" class="chart"></div>
-        <div class="actions">
-          <button id="pdfBtn" disabled>下載 PDF 報告</button>
+<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
+  <div class="max-w-6xl mx-auto px-4 py-10 space-y-12">
+    <header class="space-y-6">
+      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+        <div class="space-y-3 md:max-w-2xl">
+          <p class="text-sm uppercase tracking-[0.35em] text-indigo-400/80">Lagwell</p>
+          <h1 class="text-3xl md:text-4xl font-semibold leading-tight">Pump Test Explorer</h1>
+          <p class="text-lg text-zinc-300 leading-relaxed">
+            Fit analytical aquifer models entirely in the browser with Pyodide-powered SciPy.
+            Upload drawdown observations, compare Theis and lagging formulations, and export polished PDFs.
+          </p>
+        </div>
+        <div id="pyStatus" class="px-4 py-2 rounded-full text-sm font-medium bg-zinc-900/80 border border-zinc-800/80 text-zinc-300">
+          Python runtime not loaded
         </div>
       </div>
-    </section>
-  </main>
-  <footer>
-    <small>用途限制：研究/前評估，非簽證文件。運算：瀏覽器端 Pyodide。</small>
-  </footer>
+    </header>
+
+    <main class="space-y-10">
+      <div class="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
+        <section class="rounded-2xl border border-zinc-800/60 bg-zinc-900/60 shadow-xl p-6 space-y-6">
+          <div class="space-y-2">
+            <h2 class="text-2xl font-semibold">Model &amp; data</h2>
+            <p class="text-base text-zinc-400 leading-relaxed">
+              Provide drawdown observations to calibrate the selected model. All computation runs locally via Pyodide—no uploads required.
+            </p>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+              <span>Observation radius r (m)</span>
+              <input id="r" type="number" step="0.01" value="30" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
+            </label>
+            <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+              <span>Pumping rate Q (m³/h)</span>
+              <input id="Q" type="number" step="0.01" value="120" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
+            </label>
+          </div>
+
+          <div class="grid gap-4 sm:grid-cols-3">
+            <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+              <span>Model</span>
+              <select id="model" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
+                <option value="lagging" selected>Lagging</option>
+                <option value="theis">Theis</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+              <span>Confidence level</span>
+              <select id="conf" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
+                <option value="0.95" selected>95%</option>
+                <option value="0.90">90%</option>
+              </select>
+            </label>
+            <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+              <span>Bootstrap samples</span>
+              <select id="nBoot" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
+                <option value="50">50</option>
+                <option value="100" selected>100</option>
+                <option value="200">200</option>
+              </select>
+            </label>
+          </div>
+
+          <div id="modelDetails" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 space-y-4 text-sm text-zinc-300 overflow-visible">
+            <p>Select a model to see formulas, parameters, and assumptions.</p>
+          </div>
+
+          <div class="space-y-4">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+                <span>CSV upload</span>
+                <input id="csvFile" type="file" accept=".csv" class="block w-full text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-indigo-500/30" />
+              </label>
+              <div class="flex items-end">
+                <button id="loadExample" type="button" class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
+                  Load example dataset
+                </button>
+              </div>
+            </div>
+            <textarea id="raw" rows="8" placeholder="Paste CSV with columns: time_min, drawdown_m, optional r_m, Q_m3ph" class="w-full rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-3 text-base text-zinc-100 font-mono focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40"></textarea>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button id="fitBtn" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring focus:ring-indigo-400/60 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50">
+              Fit model
+            </button>
+            <p id="status" class="text-sm text-zinc-400">Waiting for data.</p>
+          </div>
+        </section>
+
+        <section class="rounded-2xl border border-zinc-800/60 bg-zinc-900/60 shadow-xl p-6 space-y-6">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div class="space-y-2">
+              <h2 class="text-2xl font-semibold">Results</h2>
+              <p class="text-base text-zinc-400 leading-relaxed">
+                Parameter estimates, confidence intervals, fit metrics, and plots appear after running the calibration.
+              </p>
+            </div>
+            <button id="pdfBtn" class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>
+              Export PDF
+            </button>
+          </div>
+
+          <div class="space-y-6">
+            <div class="space-y-3">
+              <h3 class="text-xl font-semibold">Parameters</h3>
+              <div id="params" class="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/40">
+                <div class="p-4 text-sm text-zinc-400">Run a fit to see parameter estimates.</div>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <h3 class="text-xl font-semibold">Metrics</h3>
+              <div id="metrics" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 text-sm text-zinc-400">
+                RMSE, R², and bootstrap settings will appear here after fitting.
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <h3 class="text-xl font-semibold">Plot</h3>
+              <div id="chart" class="h-72 w-full rounded-xl border border-zinc-800/70 bg-zinc-950/40 flex items-center justify-center text-sm text-zinc-500">
+                Observed vs fitted curves will render after calibration.
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="text-sm text-zinc-500 text-center md:text-left">
+      <strong>Disclaimer:</strong> Research/educational tool. Not certified for field use.
+    </footer>
+  </div>
   <script src="./app.js"></script>
 </body>
 </html>
