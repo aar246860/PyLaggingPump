@@ -13,7 +13,7 @@
 <body>
   <header>
     <h1>Lagwell 抽水試驗 (MVP)</h1>
-    <p>上傳 CSV 或貼資料、選模型，一鍵擬合並下載 PDF 報告。</p>
+    <p>上傳 CSV 或貼資料、選模型，一鍵擬合並下載 PDF 報告（全程瀏覽器端計算）。</p>
     <div id="pyStatus" class="py-status">Python 核心尚未載入</div>
   </header>
   <main class="container">
@@ -41,18 +41,6 @@
         </label>
         <button id="loadExample" type="button">載入示例資料</button>
       </div>
-      <details class="card" style="margin-top:12px;">
-        <summary>連線設定（API Base）</summary>
-        <div class="grid2" style="margin-top:8px;">
-          <label>API Base
-            <input id="apiBaseInput" type="text" placeholder="例如 https://your-backend.example.com" />
-          </label>
-          <div class="actions">
-            <button id="saveApiBase" type="button">儲存 API 位址</button>
-            <span id="apiStatus" style="font-size:12px;opacity:.8;"></span>
-          </div>
-        </div>
-      </details>
       <textarea id="raw" rows="8" placeholder="或直接貼上 CSV 文字..."></textarea>
       <div class="actions">
         <button id="fitBtn">開始擬合</button>
@@ -71,7 +59,7 @@
     </section>
   </main>
   <footer>
-    <small>用途限制：研究/前評估，非簽證文件。後端 API：<span id="apiDisplay"></span></small>
+    <small>用途限制：研究/前評估，非簽證文件。運算：瀏覽器端 Pyodide。</small>
   </footer>
   <script src="./app.js"></script>
 </body>
