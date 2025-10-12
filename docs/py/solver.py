@@ -21,7 +21,7 @@ from typing import Callable, Dict, Iterable, Sequence, Tuple
 
 import numpy as np
 from scipy.optimize import least_squares
-from scipy.special import expn, k0, k1
+from scipy.special import expn, kv
 
 
 FOUR_PI = 4.0 * math.pi
@@ -118,14 +118,14 @@ def _lagging_s_bar(
     k = np.sqrt((S * p_eff) / max(T, 1e-16))
     r_eval = max(float(r), rw)
     krw = k * rw
-    denom_bessel = krw * k1(krw)
+    denom_bessel = krw * kv(1, krw)
     if denom_bessel == 0:
         denom_bessel = 1e-16
 
     skin_factor = math.exp(-skin)
     storage = 1.0 + stor * p_eff
     coeff = (Q * skin_factor) / (2.0 * math.pi * T)
-    return coeff * k0(k * r_eval) / (p_eff * storage * denom_bessel)
+    return coeff * kv(0, k * r_eval) / (p_eff * storage * denom_bessel)
 
 
 def _euler_accelerated_sum(b_terms: np.ndarray, order: int) -> complex:
@@ -242,6 +242,8 @@ def fit_model(
     r: float,
     Q: float,
     priors: Dict[str, float] | None = None,
+    conf: float = 0.95,
+    **kwargs,
 ) -> Tuple[Dict[str, float], Dict[str, float], Sequence[Tuple[float, float]]]:
     """Fit the requested analytical model to drawdown data."""
 
@@ -293,7 +295,10 @@ def fit_model(
     else:
         raise ValueError(f'Unsupported model: {model_name}')
 
-    result = least_squares(residual, x0, bounds=bounds, max_nfev=600)
+    extra_args = kwargs.get("lsq_args", ())
+    if extra_args is None:
+        extra_args = ()
+    result = least_squares(residual, x0, bounds=bounds, max_nfev=600, args=extra_args)
 
     if model_name == 'lagging':
         logT, logS, log_tau_q, log_tau_s, j_param = result.x
