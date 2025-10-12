@@ -91,3 +91,60 @@ input[type="file"]::-webkit-file-upload-button:hover,
 input[type="file"]::file-selector-button:hover {
   background: rgba(129, 140, 248, 0.35);
 }
+
+.fit-history-list {
+  max-height: 18rem;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.fit-history-list::-webkit-scrollbar {
+  width: 0.45rem;
+}
+
+.fit-history-list::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.4);
+  border-radius: 9999px;
+}
+
+.fit-history-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.65);
+}
+
+.fit-history-item {
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.fit-history-item:hover {
+  background-color: rgba(63, 63, 70, 0.35);
+}
+
+.fit-history-item.is-selected {
+  border-left-color: rgba(99, 102, 241, 0.65);
+  background-color: rgba(39, 39, 42, 0.55);
+}
+
+.fit-history-item.is-selected .fit-history-meta {
+  color: rgba(165, 180, 252, 0.95);
+}
+
+.fit-history-checkbox {
+  accent-color: rgb(129, 140, 248);
+}
+
+#reportModalContent {
+  animation: modal-pop 0.24s ease;
+}
+
+@keyframes modal-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
