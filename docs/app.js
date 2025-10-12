@@ -3,7 +3,6 @@ const $ = (sel) => document.querySelector(sel);
 const pyStatus = $('#pyStatus');
 let pyodideInstance = null;
 let solverLoaded = false;
-let fitPy = null;
 
 async function ensurePyodide() {
   if (pyodideInstance && solverLoaded) {
@@ -41,10 +40,8 @@ async function ensurePyodide() {
       const code = await (await fetch('./py/solver.py')).text();
       await pyodideInstance.runPythonAsync(code);
       solverLoaded = true;
-      if (fitPy && typeof fitPy.destroy === 'function') {
-        fitPy.destroy();
-      }
-      fitPy = pyodideInstance.globals.get('fit_model');
+      const fitProxy = pyodideInstance.globals.get('fit_model');
+      if (fitProxy && typeof fitProxy.destroy === 'function') fitProxy.destroy();
       if (pyStatus) {
         pyStatus.textContent = 'Python ready（瀏覽器端運算）';
         pyStatus.classList.add('ready');
@@ -56,10 +53,6 @@ async function ensurePyodide() {
       }
       throw err;
     }
-  }
-
-  if (!fitPy) {
-    fitPy = pyodideInstance.globals.get('fit_model');
   }
 
   return pyodideInstance;
@@ -105,17 +98,16 @@ $('#fitBtn').addEventListener('click', async () => {
     const pyTimes = py.toPy(Array.from(times));
     const pyDraws = py.toPy(Array.from(draws));
 
-    let pyResult = null;
+    let fitPy = null;
+    let resultPy = null;
     const pyproxies = [];
     try {
-      if (!fitPy || typeof fitPy.call !== 'function') {
-        fitPy = py.globals.get('fit_model');
-      }
-      if (!fitPy || typeof fitPy.call !== 'function') {
+      fitPy = py.globals.get('fit_model');
+      if (!fitPy || typeof fitPy.callKwargs !== 'function') {
         throw new Error('fit_model 尚未載入');
       }
-      pyResult = fitPy(pyTimes, pyDraws, model, _r, _Q);
-      const fitResult = pyResult.toJs({ pyproxies, dict_converter: Object.fromEntries });
+      resultPy = fitPy.callKwargs({ args: [pyTimes, pyDraws, model, _r, _Q] });
+      const fitResult = resultPy.toJs({ pyproxies, dict_converter: Object.fromEntries });
       try {
         const [params = {}, metrics = {}, fitted = []] = Array.isArray(fitResult) ? fitResult : [];
         const resultObj = {
@@ -139,10 +131,15 @@ $('#fitBtn').addEventListener('click', async () => {
         $('#pdfBtn').disabled = false;
         $('#status').textContent = '完成（瀏覽器端 Python）';
       } finally {
-        for (const p of pyproxies) {
-          if (p && typeof p.destroy === 'function') p.destroy();
+        if (py && py.ffi && typeof py.ffi.destroy_proxies === 'function') {
+          py.ffi.destroy_proxies(pyproxies);
+        } else {
+          for (const proxy of pyproxies) {
+            if (proxy && typeof proxy.destroy === 'function') proxy.destroy();
+          }
         }
-        if (pyResult && typeof pyResult.destroy === 'function') pyResult.destroy();
+        if (resultPy && typeof resultPy.destroy === 'function') resultPy.destroy();
+        if (fitPy && typeof fitPy.destroy === 'function') fitPy.destroy();
       }
     } finally {
       if (pyTimes && typeof pyTimes.destroy === 'function') pyTimes.destroy();
@@ -295,8 +292,11 @@ function formatNumber(value, digits = 3) {
 }
 
 window.addEventListener('unload', () => {
-  if (fitPy && typeof fitPy.destroy === 'function') {
-    fitPy.destroy();
+  if (!pyodideInstance) return;
+  try {
+    const fitProxy = pyodideInstance.globals.get('fit_model');
+    if (fitProxy && typeof fitProxy.destroy === 'function') fitProxy.destroy();
+  } catch (err) {
+    console.warn('無法銷毀 fit_model proxy：', err);
   }
-  fitPy = null;
 });
