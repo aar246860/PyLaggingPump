@@ -7,11 +7,14 @@
   <title>Lagwell 抽水試驗 (MVP)</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 <body>
   <header>
     <h1>Lagwell 抽水試驗 (MVP)</h1>
     <p>上傳 CSV 或貼資料、選模型，一鍵擬合並下載 PDF 報告。</p>
+    <div id="pyStatus" class="py-status">Python 核心尚未載入</div>
   </header>
   <main class="container">
     <section class="card">
@@ -23,7 +26,6 @@
           <select id="model">
             <option value="lagging" selected>Lagging</option>
             <option value="theis">Theis</option>
-            <option value="neuman">Neuman</option>
           </select>
         </label>
         <label>信賴水準

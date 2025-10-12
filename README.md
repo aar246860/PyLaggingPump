@@ -21,6 +21,19 @@ python -m http.server 5173 --directory docs
 ```
 
 - 前端會在 `localStorage` 中記住 API Base；可於網址加上 `?api=https://your-api.example.com` 或透過頁面下方的「連線設定」區塊調整。
+- 預設會在瀏覽器內透過 **Pyodide** 執行 Python 擬合（無需後端）。
+
+## 純前端（GitHub Pages）模式
+
+- GitHub Pages 為純靜態主機，不提供任何後端 API；本專案現在完全在瀏覽器端完成擬合與報告生成。
+- 藉由 [Pyodide](https://pyodide.org/) 於瀏覽器載入 Python 與 SciPy，直接計算 Theis、Lagging 等模型。
+- 報告以 [jsPDF](https://github.com/parallax/jsPDF) 在前端產生 PDF，下載時不需與伺服器互動。
+- 「連線設定」仍可設定雲端 API，若 Pyodide 初始化失敗或想使用遠端後端，仍可切換回原本的 `/fit` 與 `/report`。
+
+## 本機開發
+
+- 直接以瀏覽器開啟 `docs/index.html` 即可體驗純前端模式。
+- 或使用 `python -m http.server --directory docs` 啟動簡易伺服器，瀏覽 `http://localhost:8000/`（或自訂連接埠）。
 
 ## 在本機測試（HTTP ↔ HTTP）
 
