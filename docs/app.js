@@ -105,6 +105,7 @@ function registerSessionListeners() {
   const bindings = [
     [radiusInput, 'input'],
     [qInput, 'input'],
+    [modelSelect, 'change'],
     [confSelect, 'change'],
     [nBootSelect, 'change'],
     [rawInput, 'input'],
@@ -551,94 +552,177 @@ if (pdfBtn) {
       alert('jsPDF failed to load. Please try again.');
       return;
     }
-    const doc = new window.jspdf.jsPDF();
-    const { model, r, Q, params, metrics, conf, nBoot, ci } = window._lastFit;
+
+    // --- START: Professional PDF Generation Logic ---
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const { model, r, Q, params, metrics, conf, nBoot, ci, curves } = window._lastFit;
     const modelLabel = currentModelMeta?.name || model.toUpperCase();
-    doc.setFontSize(18);
-    doc.text('Lagwell Pump Test Report', 14, 20);
-    doc.setFontSize(12);
-    let y = 32;
-    doc.text(`Model: ${modelLabel}`, 14, y);
-    y += 8;
-    doc.text(`Radius r (m): ${formatNumber(r, 3)}`, 14, y);
-    y += 8;
-    doc.text(`Pumping rate Q (m³/h): ${formatNumber(Q, 3)}`, 14, y);
-    y += 8;
     const confPercent = Math.round((conf || 0) * 100);
-    doc.text(`Confidence level: ${confPercent}%`, 14, y);
-    y += 8;
-    if (Number.isFinite(nBoot)) {
-      doc.text(`Bootstrap samples: ${nBoot}`, 14, y);
-      y += 8;
-    }
-    doc.text('Computation: Pyodide (in-browser)', 14, y);
-    y += 14;
+    let y = 0; // Y-position tracker
 
+    // --- 1. Report Header ---
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Pumping Test Analysis Report', 105, 20, { align: 'center' });
+
+    // --- 2. Project Information Table ---
+    const projectInfo = [
+      ['Project:', 'Sample Project'],
+      ['Client:', 'N/A'],
+      ['Location:', 'N/A'],
+      ['Test Date:', new Date().toLocaleDateString()],
+    ];
+    doc.autoTable({
+      body: projectInfo,
+      theme: 'plain',
+      startY: 30,
+      styles: { fontSize: 10 },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 30 } },
+    });
+    y = doc.previousAutoTable.finalY + 10;
+
+    // --- 3. Analysis Settings Table ---
     doc.setFontSize(14);
-    doc.text(`Parameters (${confPercent}% CI)`, 14, y);
-    y += 8;
-    doc.setFontSize(12);
-    const paramKeys = Object.keys(params || {});
-    if (!paramKeys.length) {
-      doc.text('No parameter estimates available.', 18, y);
-      y += 7;
-    } else {
-      paramKeys.forEach((key) => {
-        const estimate = formatNumber(params[key]);
-        const ciPair = Array.isArray(ci?.[key]) && ci[key].length === 2
-          ? `[${formatNumber(ci[key][0])}, ${formatNumber(ci[key][1])}]`
-          : '—';
-        doc.text(`${key}: ${estimate}   ${confPercent}% CI: ${ciPair}`, 18, y);
-        y += 7;
-      });
-    }
+    doc.setFont('helvetica', 'bold');
+    doc.text('Analysis Settings', 14, y);
+    y += 6;
+    const settingsBody = [
+      ['Model', modelLabel],
+      ['Observation Radius r (m)', formatNumber(r, 3)],
+      ['Pumping Rate Q (m³/h)', formatNumber(Q, 3)],
+      ['Confidence Level', `${confPercent}%`],
+      ['Bootstrap Samples', nBoot],
+      ['Computation Runtime', 'Pyodide (In-Browser)'],
+    ];
+    doc.autoTable({
+      head: [['Setting', 'Value']],
+      body: settingsBody,
+      startY: y,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] },
+      didDrawPage: (data) => {
+        y = data.cursor.y;
+      },
+    });
+    y = doc.previousAutoTable.finalY + 15;
 
-    y += 5;
+    // --- 4. Parameter Estimates Table ---
     doc.setFontSize(14);
-    doc.text('Fit metrics', 14, y);
-    y += 8;
-    doc.setFontSize(12);
-    let metricsPrinted = false;
-    if (metrics) {
-      if (typeof metrics.rmse === 'number') {
-        doc.text(`RMSE = ${formatNumber(metrics.rmse)}`, 18, y);
-        y += 7;
-        metricsPrinted = true;
-      }
-      if (typeof metrics.r2 === 'number') {
-        doc.text(`R² = ${formatNumber(metrics.r2, 4)}`, 18, y);
-        y += 7;
-        metricsPrinted = true;
-      }
-    }
-    if (!metricsPrinted) {
-      doc.text('No metrics available.', 18, y);
-      y += 7;
-    }
+    doc.setFont('helvetica', 'bold');
+    doc.text('Parameter Estimates', 14, y);
+    y += 6;
+    const paramBody = Object.keys(params || {}).map((key) => {
+      const ciPair = Array.isArray(ci?.[key]) ? `[${formatNumber(ci[key][0])}, ${formatNumber(ci[key][1])}]` : '—';
+      return [key, formatNumber(params[key]), ciPair];
+    });
+    doc.autoTable({
+      head: [['Parameter', 'Estimated Value', `${confPercent}% Confidence Interval`]],
+      body: paramBody,
+      startY: y,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] },
+      didDrawPage: (data) => {
+        y = data.cursor.y;
+      },
+    });
+    y = doc.previousAutoTable.finalY + 15;
 
+    // --- 5. Fit Metrics Table ---
+    const metricsBody = [
+      ['Root Mean Square Error (RMSE)', typeof metrics?.rmse === 'number' ? formatNumber(metrics.rmse) : 'N/A'],
+      ['Coefficient of Determination (R²)', typeof metrics?.r2 === 'number' ? formatNumber(metrics.r2, 4) : 'N/A'],
+    ];
+    doc.autoTable({
+      head: [['Metric', 'Value']],
+      body: metricsBody,
+      startY: y,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] },
+      didDrawPage: (data) => {
+        y = data.cursor.y;
+      },
+    });
+    y = doc.previousAutoTable.finalY + 10;
+
+    // --- 6. High-Contrast Chart Generation ---
     const chartEl = document.getElementById('chart');
     if (window.Plotly && chartEl && chartEl.data && chartEl.data.length) {
+      const observedPoints = Array.isArray(curves?.observed) ? curves.observed : [];
+      const fittedPoints = Array.isArray(curves?.fitted) ? curves.fitted : [];
+      const exportLayout = {
+        paper_bgcolor: 'rgba(255,255,255,1)',
+        plot_bgcolor: 'rgba(255,255,255,1)',
+        font: { color: '#000000', size: 10 },
+        margin: { l: 60, r: 24, t: 40, b: 50 },
+        title: { text: 'Time-Drawdown Curve Fit', font: { size: 16 } },
+        xaxis: {
+          title: 'Time (min)',
+          gridcolor: '#e0e0e0',
+          zerolinecolor: '#bdbdbd',
+        },
+        yaxis: {
+          title: 'Drawdown (m)',
+          gridcolor: '#e0e0e0',
+          zerolinecolor: '#bdbdbd',
+        },
+        legend: { orientation: 'h', y: -0.2, x: 0.5, xanchor: 'center' },
+      };
+
+      // Re-map curve data to the correct format for Plotly
+      const exportObsTrace = {
+        name: 'Observed',
+        mode: 'markers',
+        type: 'scatter',
+        marker: { color: '#0d47a1', size: 5 },
+        x: observedPoints.map((d) => d[0]),
+        y: observedPoints.map((d) => d[1]),
+      };
+      const exportFitTrace = {
+        name: 'Fitted',
+        mode: 'lines',
+        type: 'scatter',
+        line: { color: '#b71c1c', width: 1.5 },
+        x: fittedPoints.map((d) => d[0]),
+        y: fittedPoints.map((d) => d[1]),
+      };
+
       try {
-        const png = await window.Plotly.toImage(chartEl, { format: 'png', width: 900, height: 520 });
+        const png = await window.Plotly.toImage(chartEl, {
+          format: 'png',
+          width: 1000,
+          height: 550,
+          data: [exportObsTrace, exportFitTrace],
+          layout: exportLayout,
+        });
+
         const imgWidth = 180;
-        const imgHeight = (imgWidth * 520) / 900;
-        if (y + imgHeight + 16 > 280) {
+        const imgHeight = (imgWidth * 550) / 1000;
+        if (y + imgHeight + 20 > 280) {
           doc.addPage();
           y = 20;
-        } else {
-          y += 8;
         }
+
         doc.setFontSize(14);
-        doc.text('Observed vs fitted drawdown', 14, y);
-        y += 6;
+        doc.setFont('helvetica', 'bold');
+        doc.text('Graphical Analysis', 14, y);
+        y += 8;
         doc.addImage(png, 'PNG', 14, y, imgWidth, imgHeight);
-        y += imgHeight + 6;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.text('Figure 1: Observed drawdown vs. fitted analytical model.', 105, y + imgHeight + 5, { align: 'center' });
       } catch (imgErr) {
         console.warn('Unable to export plot image:', imgErr);
+        doc.addPage();
+        doc.setFontSize(10);
+        doc.setTextColor(255, 0, 0);
+        doc.text('Error: Could not generate plot image for the report.', 14, 20);
       }
     }
 
-    doc.save('lagwell_report.pdf');
+    doc.save(`Lagwell_Report_${model}_${new Date().toISOString().slice(0, 10)}.pdf`);
+    // --- END: Professional PDF Generation Logic ---
   });
 }
 
