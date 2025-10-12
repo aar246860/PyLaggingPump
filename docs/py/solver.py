@@ -7,16 +7,19 @@ front-end are :func:`theis_drawdown`, :func:`lagging_drawdown_time`, and the
 high level :func:`fit_model` curve fitting helper.
 
 The lagging response is evaluated in the Laplace domain and numerically
-inverted in time using the Fourier-accelerated de Hoog, Knight & Stokes (1982)
-algorithm.  The implementation below follows the formulation in Lin & Yeh
-(2017, Water Resources Research) when neglecting skin and wellbore storage; it
-retains optional parameters so the model can be extended without touching the
+inverted in time using the Gaver–Stehfest algorithm by default, providing a
+lightweight option that runs comfortably inside Pyodide.  A Fourier-accelerated
+de Hoog, Knight & Stokes (1982) implementation is also available for scenarios
+that require higher accuracy.  The formulation follows Lin & Yeh (2017, *Water
+Resources Research*) when neglecting skin and wellbore storage while retaining
+optional parameters so the model can be extended without touching the
 JavaScript bridge.
 """
 
 from __future__ import annotations
 
 import math
+from functools import lru_cache
 from typing import Callable, Dict, Iterable, Sequence, Tuple
 
 import numpy as np
@@ -26,6 +29,34 @@ from scipy.special import expn, kv
 
 FOUR_PI = 4.0 * math.pi
 EPS_TIME = 1e-12
+
+
+@lru_cache(maxsize=16)
+def _stehfest_coefficients(n: int) -> np.ndarray:
+    """Return the :math:`n` Stehfest coefficients for numerical inversion."""
+
+    if n <= 0 or n % 2 != 0:
+        raise ValueError("Stehfest requires a positive even number of terms")
+
+    coeffs = np.zeros(n)
+    half = n // 2
+    for k in range(1, n + 1):
+        total = 0.0
+        sign = (-1) ** (k + half)
+        lower = (k + 1) // 2
+        upper = min(k, half)
+        for j_val in range(lower, upper + 1):
+            numerator = j_val**half * math.factorial(2 * j_val)
+            denominator = (
+                math.factorial(half - j_val)
+                * math.factorial(j_val)
+                * math.factorial(j_val - 1)
+                * math.factorial(k - j_val)
+                * math.factorial(2 * j_val - k)
+            )
+            total += numerator / denominator
+        coeffs[k - 1] = sign * total
+    return coeffs
 
 
 def _ensure_array(t: Iterable[float]) -> np.ndarray:
@@ -201,6 +232,33 @@ def inv_laplace_dehoog(
     return out
 
 
+def inv_laplace_stehfest(
+    F: Callable[[complex], complex],
+    t_arr: Sequence[float],
+    n_terms: int = 12,
+) -> np.ndarray:
+    """Numerically invert ``F`` using the Gaver–Stehfest algorithm."""
+
+    times = _ensure_array(t_arr)
+    coeffs = _stehfest_coefficients(int(n_terms))
+    ln2 = math.log(2.0)
+    out = np.zeros_like(times, dtype=float)
+
+    for idx, t in enumerate(times):
+        if t <= 0.0:
+            out[idx] = 0.0
+            continue
+
+        scale = ln2 / max(float(t), EPS_TIME)
+        total = 0.0 + 0.0j
+        for k_idx, coeff in enumerate(coeffs, start=1):
+            total += coeff * F(k_idx * scale)
+        value = scale * total
+        out[idx] = float(np.real_if_close(value, tol=1000.0))
+
+    return out
+
+
 def lagging_drawdown_time(
     t: Sequence[float],
     T: float,
@@ -210,6 +268,8 @@ def lagging_drawdown_time(
     r: float,
     Q: float,
     j: float = 0.0,
+    method: str = "stehfest",
+    stehfest_terms: int = 12,
 ) -> np.ndarray:
     """Lagging model in the time domain via numerical inverse Laplace."""
 
@@ -218,7 +278,14 @@ def lagging_drawdown_time(
     def F(p: complex) -> complex:
         return _lagging_s_bar(p, r, T, S, tau_q, tau_s, Q, j=j)
 
-    values = inv_laplace_dehoog(F, times)
+    method_lower = method.lower()
+    if method_lower == "stehfest":
+        values = inv_laplace_stehfest(F, times, n_terms=stehfest_terms)
+    elif method_lower == "dehoog":
+        values = inv_laplace_dehoog(F, times)
+    else:
+        raise ValueError(f"Unknown Laplace inversion method: {method}")
+
     # The model is real-valued; enforce numerical stability.
     return np.clip(values, a_min=-1e6, a_max=1e6)
 
