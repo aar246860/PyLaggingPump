@@ -90,7 +90,7 @@
         </nav>
       </aside>
 
-      <article id="doc" class="prose prose-invert max-w-none">
+      <article id="doc" class="prose prose-invert">
         <section id="background" class="doc-section">
           <h2>Background</h2>
           <p>
@@ -113,13 +113,33 @@
                = T\,\nabla_r^2 s + \tau_s T\,\frac{\partial}{\partial t}\big(\nabla_r^2 s\big) $$
           </div>
           <ul class="grid md:grid-cols-2 gap-4 mt-4">
-            <li><strong>$$T$$</strong> — Transmissivity ($$\mathrm{L}^2/\mathrm{T}$$)</li>
-            <li><strong>$$S$$</strong> — Storativity ($$-$$)</li>
-            <li><strong>$$\tau_q$$</strong> — Flux phase lag (time)</li>
-            <li><strong>$$\tau_s$$</strong> — Drawdown gradient lag (time)</li>
+            <li class="flex gap-3 items-start">
+              <span class="math-inline text-lg font-semibold">\(T\)</span>
+              <div class="text-zinc-300">
+                Transmissivity <span class="nowrap">( <span class="math-inline">\( \mathrm{L}^2/\mathrm{T} \)</span> )</span>
+              </div>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="math-inline text-lg font-semibold">\(S\)</span>
+              <div class="text-zinc-300">
+                Storativity <span class="nowrap">( <span class="math-inline">\( - \)</span> )</span>
+              </div>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="math-inline text-lg font-semibold">\(\tau_q\)</span>
+              <div class="text-zinc-300">
+                Flux phase lag <span class="nowrap">( <span class="math-inline">\( \mathrm{T} \)</span> )</span>
+              </div>
+            </li>
+            <li class="flex gap-3 items-start">
+              <span class="math-inline text-lg font-semibold">\(\tau_s\)</span>
+              <div class="text-zinc-300">
+                Drawdown gradient lag <span class="nowrap">( <span class="math-inline">\( \mathrm{T} \)</span> )</span>
+              </div>
+            </li>
           </ul>
           <p class="mt-3 text-zinc-300">
-            When $$\tau_q = \tau_s = 0$$ this reduces to the classical diffusion equation (Theis).
+            When <span class="math-inline">\( \tau_q = \tau_s = 0 \)</span> this reduces to the classical diffusion equation (Theis).
             Unequal lags reproduce early- and mid-time anomalies observed in fractured/leaky settings.
           </p>
           <div class="card p-6 mt-4 space-y-3">
@@ -131,7 +151,7 @@
             </p>
             <p class="text-zinc-300">
               Parameter identifiability improves when observation wells capture both early and late times.
-              Bootstrap resampling (see below) is used to quantify uncertainty in $$T, S, \tau_q, \tau_s$$.
+              Bootstrap resampling (see below) is used to quantify uncertainty in <span class="math-inline">\(T, S, \tau_q, \tau_s\)</span>.
             </p>
           </div>
         </section>
@@ -181,7 +201,7 @@
           <h2>Bootstrap Confidence Intervals</h2>
           <p>
             The tool resamples residuals/data and refits the model to estimate parameter distributions,
-            reporting 95% intervals (e.g., $$[2.5\%, 97.5\%]$$ percentiles). The fitted curve can be
+            reporting 95% intervals (e.g., <span class="math-inline">\([2.5\%, 97.5\%]\)</span> percentiles). The fitted curve can be
             shown with a confidence band for visual uncertainty.
           </p>
           <div class="card p-6 mt-4 space-y-3">
@@ -199,7 +219,7 @@
           <h2>How to Use the Tool</h2>
           <ol class="list-decimal pl-5 space-y-2">
             <li>Prepare CSV: <code>time, drawdown</code> (consistent units).</li>
-            <li>Load data / set initial values for $$T, S, \tau_q, \tau_s$$.</li>
+            <li>Load data / set initial values for <span class="math-inline">\(T, S, \tau_q, \tau_s\)</span>.</li>
             <li>Run fit (optionally enable bootstrap for CIs).</li>
             <li>Inspect parameters, intervals, and the plot; export PDF.</li>
           </ol>
@@ -216,7 +236,7 @@
             <p class="mt-2 text-zinc-300">Try adjusting initial guesses or bounds; ensure units are consistent.</p>
           </details>
           <details class="card p-4 mt-3">
-            <summary class="font-medium">How should I interpret large $$\tau_q$$ values?</summary>
+            <summary class="font-medium">How should I interpret large <span class="math-inline">\(\tau_q\)</span> values?</summary>
             <p class="mt-2 text-zinc-300">Large lag indicates strong inertial or structural resistance. Check well construction and nearby boundaries before accepting the result.</p>
           </details>
           <details class="card p-4 mt-3">
