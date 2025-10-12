@@ -139,24 +139,19 @@ def _lagging_s_bar(
     skin = float(Sk)
     stor = max(float(C_D), 0.0)
 
-    # Effective Laplace variable once the delayed responses are introduced.
     denom = 1.0 + tau_s * p
     if abs(denom) < 1e-16:
         denom = 1e-16
-    p_eff = (p * (1.0 + tau_q * p) + j) / denom
 
-    # Hydraulic diffusivity for the modified system.
-    k = np.sqrt((S * p_eff) / max(T, 1e-16))
+    factor = (p + j) * (1.0 + tau_q * p) / denom
+    diffusivity = max(T, 1e-16) / max(S, 1e-16)
+    k = np.sqrt(factor / diffusivity)
     r_eval = max(float(r), rw)
-    krw = k * rw
-    denom_bessel = krw * kv(1, krw)
-    if denom_bessel == 0:
-        denom_bessel = 1e-16
 
     skin_factor = math.exp(-skin)
-    storage = 1.0 + stor * p_eff
+    storage = 1.0 + stor * p
     coeff = (Q * skin_factor) / (2.0 * math.pi * T)
-    return coeff * kv(0, k * r_eval) / (p_eff * storage * denom_bessel)
+    return coeff * kv(0, k * r_eval) / (p * storage)
 
 
 def _euler_accelerated_sum(b_terms: np.ndarray, order: int) -> complex:

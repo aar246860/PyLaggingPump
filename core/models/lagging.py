@@ -45,32 +45,44 @@ from typing import Callable
 import numpy as np
 from numpy.lib.scimath import sqrt as csqrt
 from numpy.typing import ArrayLike
-from scipy.special import kv, kve
+from scipy.special import kv
 
 
-def _dimensionless_parameters(
+def _lagging_laplace_value(
+    p_val: complex,
     T: float,
     S: float,
     tau_q: float,
     tau_s: float,
     r: float,
-    rw: float,
+    Q: float,
     j: float,
-) -> tuple[float, float, float, float, float]:
-    """Return the dimensionless scaling parameters."""
+    rw: float,
+) -> complex:
+    """Evaluate the lagging drawdown in the Laplace domain."""
 
-    if rw <= 0:
-        raise ValueError("Well radius rw must be positive.")
+    p_val = complex(p_val)
+    if p_val == 0:
+        return np.inf
 
-    alpha = T / (S * rw**2)
-    if alpha <= 0:
-        raise ValueError("Transmissivity and storage must yield positive scaling.")
+    T_eff = max(float(T), 1e-16)
+    S_eff = max(float(S), 1e-16)
+    tau_q = max(float(tau_q), 0.0)
+    tau_s = max(float(tau_s), 0.0)
+    Q = float(Q)
+    j = max(float(j), 0.0)
+    rw = max(float(rw), 1e-8)
+    r_eff = max(float(r), rw)
 
-    r_D = max(r, rw) / rw
-    tau_qD = T * tau_q / (S * rw**2)
-    tau_sD = T * tau_s / (S * rw**2)
-    j = max(j, 0.0)
-    return alpha, r_D, tau_qD, tau_sD, j
+    denom = 1.0 + tau_s * p_val
+    if denom == 0:
+        denom = 1e-30
+
+    factor = (p_val + j) * (1.0 + tau_q * p_val) / denom
+    k = csqrt((S_eff / T_eff) * factor)
+    arg = r_eff * k
+
+    return (Q / (2.0 * np.pi * T_eff)) * kv(0, arg) / p_val
 
 
 def _stehfest_coefficients(n: int) -> np.ndarray:
@@ -120,33 +132,7 @@ def drawdown_laplace_domain(
 ) -> Callable[[complex], complex]:
     """Return the Laplace transform :math:`\tilde{s}(p)` of the drawdown."""
 
-    alpha, r_D, tau_qD, tau_sD, j = _dimensionless_parameters(T, S, tau_q, tau_s, r, rw, j)
-    prefactor = (Q / (4.0 * np.pi * T)) * (1.0 / alpha)
-
-    def S_of_p(p_val: complex) -> complex:
-        p_val = complex(p_val)
-        if p_val == 0:
-            return np.inf
-
-        p_D = p_val / alpha
-        numerator = p_D + j * (1.0 + tau_qD * p_D)
-        denominator = 1.0 + tau_sD * p_D
-        k = csqrt(numerator / denominator)
-
-        if abs(k) < 1e-12:
-            k = 1e-12 + 0j
-
-        K0 = kv(0, k * r_D)
-        K1 = kv(1, k)
-        if K1 == 0:
-            # fall back to scaled Bessel functions for extreme arguments
-            K0 = kve(0, k * r_D) * np.exp(-np.real(k * r_D))
-            K1 = kve(1, k) * np.exp(-np.real(k))
-
-        B = (1.0 + tau_qD * p_D) / (p_D * (1.0 + tau_sD * p_D) * k * K1)
-        return prefactor * B * K0
-
-    return S_of_p
+    return lambda p_val: _lagging_laplace_value(p_val, T, S, tau_q, tau_s, r, Q, j, rw)
 
 
 def drawdown_time_domain(
@@ -165,43 +151,25 @@ def drawdown_time_domain(
     """Return the lagging drawdown (metres) evaluated at ``t`` seconds."""
 
     t = np.asarray(t, dtype=float)
-    alpha, r_D, tau_qD, tau_sD, j = _dimensionless_parameters(T, S, tau_q, tau_s, r, rw, j)
-
-    def S_D(p_D: complex) -> complex:
-        if p_D == 0:
-            return np.inf
-
-        numerator = p_D + j * (1.0 + tau_qD * p_D)
-        denominator = 1.0 + tau_sD * p_D
-        k = csqrt(numerator / denominator)
-
-        if abs(k) < 1e-12:
-            k = 1e-12 + 0j
-
-        K0 = kv(0, k * r_D)
-        K1 = kv(1, k)
-        if K1 == 0:
-            K0 = kve(0, k * r_D) * np.exp(-np.real(k * r_D))
-            K1 = kve(1, k) * np.exp(-np.real(k))
-
-        B = (1.0 + tau_qD * p_D) / (p_D * (1.0 + tau_sD * p_D) * k * K1)
-        return B * K0
-
     coeffs = _stehfest_coeff_cache(12)
     ln2 = np.log(2.0)
     results = np.zeros_like(t, dtype=float)
 
+    laplace_eval = drawdown_laplace_domain(
+        np.asarray([], dtype=float), T, S, tau_q, tau_s, r, Q, j=j, rw=rw, rc=rc, Sk=Sk
+    )
+
     for idx, t_val in enumerate(t):
-        t_D = max(t_val * alpha, 1e-12)
-        if t_D <= 1e-12:
+        t_eff = max(t_val, 0.0)
+        if t_eff <= 0.0:
             results[idx] = 0.0
             continue
 
+        scale = ln2 / max(t_eff, 1e-12)
         total = 0.0 + 0.0j
         for k_idx, V_k in enumerate(coeffs, start=1):
-            p_D = k_idx * ln2 / t_D
-            total += V_k * S_D(p_D)
-        s_D = np.real(ln2 / t_D * total)
-        results[idx] = (Q / (4.0 * np.pi * T)) * s_D
+            p_val = k_idx * scale
+            total += V_k * laplace_eval(p_val)
+        results[idx] = float(np.real(scale * total))
 
     return results
