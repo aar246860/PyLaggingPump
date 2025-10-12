@@ -1,32 +1,86 @@
 
-const DEFAULT_API_BASE = 'http://localhost:8000';
-const params = new URLSearchParams(window.location.search);
-const queryApi = params.get('api');
-if (queryApi) {
-  localStorage.setItem('lagwell_api', queryApi);
-}
-let API_BASE = queryApi || localStorage.getItem('lagwell_api') || DEFAULT_API_BASE;
-
 const $ = (sel) => document.querySelector(sel);
 
 const apiDisplay = $('#apiDisplay');
-const apiBaseInput = $('#apiBase');
+const apiInput = $('#apiBaseInput');
+const apiStatus = $('#apiStatus');
+const saveBtn = $('#saveApiBase');
+let mixedContentWarning = false;
 
-function setApiBase(next) {
-  const sanitized = (next || '').trim() || DEFAULT_API_BASE;
-  API_BASE = sanitized;
-  localStorage.setItem('lagwell_api', sanitized);
-  if (apiDisplay) apiDisplay.textContent = sanitized;
-  if (apiBaseInput && apiBaseInput.value !== sanitized) {
-    apiBaseInput.value = sanitized;
+function resolveApiBase() {
+  const url = new URL(window.location.href);
+  const p = url.searchParams.get('api');
+  if (p) {
+    localStorage.setItem('lagwell_api', p);
+  }
+  const stored = localStorage.getItem('lagwell_api');
+  const fallback = window.location.protocol === 'https:' ? '' : 'http://localhost:8000';
+  return stored || fallback;
+}
+
+let API_BASE = resolveApiBase();
+
+function updateApiUi() {
+  if (apiDisplay) {
+    apiDisplay.textContent = API_BASE || '(未設定)';
+  }
+  if (apiInput && apiInput.value !== (API_BASE || '')) {
+    apiInput.value = API_BASE || '';
   }
 }
 
-setApiBase(API_BASE);
+function warnMixed() {
+  if (!apiStatus) return;
+  mixedContentWarning = false;
+  if (!API_BASE) {
+    apiStatus.textContent = '';
+    return;
+  }
+  try {
+    const parsed = new URL(API_BASE);
+    if (window.location.protocol === 'https:' && parsed.protocol === 'http:') {
+      mixedContentWarning = true;
+      apiStatus.textContent = '⚠️ 你在 HTTPS 頁面使用 HTTP API，瀏覽器會封鎖（Mixed Content）。請改用 HTTPS 後端或本機前端。';
+    }
+  } catch (err) {
+    apiStatus.textContent = '';
+    // ignore invalid URL parsing here; testApi will surface errors
+  }
+}
 
-if (apiBaseInput) {
-  apiBaseInput.addEventListener('change', (e) => setApiBase(e.target.value));
-  apiBaseInput.addEventListener('blur', (e) => setApiBase(e.target.value));
+async function testApi() {
+  warnMixed();
+  if (!apiStatus) return;
+  if (!API_BASE) {
+    apiStatus.textContent = '請在上方設定 API 位址（HTTPS 建議）';
+    return;
+  }
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    if (!res.ok) throw new Error(res.status);
+    apiStatus.textContent = `✅ 已連線：${API_BASE}`;
+  } catch (err) {
+    if (!mixedContentWarning) {
+      apiStatus.textContent = `❌ 無法連線：${API_BASE}（${err}）`;
+    }
+  }
+}
+
+updateApiUi();
+testApi();
+
+if (saveBtn) {
+  saveBtn.addEventListener('click', () => {
+    const value = (apiInput?.value || '').trim();
+    if (!value) {
+      alert('請輸入 API Base，例如 https://your-backend.example.com');
+      return;
+    }
+    localStorage.setItem('lagwell_api', value);
+    API_BASE = value;
+    updateApiUi();
+    testApi();
+  });
 }
 
 $('#loadExample').addEventListener('click', () => {
@@ -47,6 +101,10 @@ $('#csvFile').addEventListener('change', async (e) => {
 
 $('#fitBtn').addEventListener('click', async () => {
   try {
+    if (!API_BASE) {
+      $('#status').textContent = '請先在連線設定中設定 API Base';
+      return;
+    }
     $('#status').textContent = '擬合中...';
     $('#pdfBtn').disabled = true;
     const r = parseFloat($('#r').value);
@@ -88,6 +146,10 @@ $('#pdfBtn').addEventListener('click', async () => {
     plot_base64: null,
     license_sn: 'DEMO-0000'
   };
+  if (!API_BASE) {
+    alert('請先設定 API Base');
+    return;
+  }
   const res = await fetch(`${API_BASE}/report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
