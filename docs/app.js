@@ -12,9 +12,18 @@ const radiusInput = $('#r');
 const qInput = $('#Q');
 const confSelect = $('#conf');
 const rawInput = $('#raw');
+const reportModal = $('#reportModal');
+const generateReportBtn = $('#generateReportBtn');
+const cancelReportBtn = $('#cancelReportBtn');
+const reportProjectNameInput = $('#reportProjectName');
+const reportClientInput = $('#reportClient');
+const reportLocationInput = $('#reportLocation');
+const fitHistoryContainer = $('#fitHistory');
+const clearHistoryBtn = $('#clearHistoryBtn');
 
 let cachedStorage = null;
 let storageChecked = false;
+let fitHistory = [];
 
 function getSessionStorage() {
   if (storageChecked) return cachedStorage;
@@ -494,6 +503,9 @@ if (fitBtn) {
         const [params = {}, metrics = {}, fitted = [], ci = {}] = Array.isArray(fitResult) ? fitResult : [];
         const { params: filteredParams, ci: filteredCi } = filterParamsForModel(params, ci, currentModelMeta);
         const metricsObj = metrics && typeof metrics === 'object' ? metrics : {};
+        const createdAt = new Date();
+        const modelLabel = currentModelMeta?.name || model.toUpperCase();
+        const runLabel = `Fit ${fitHistory.length + 1}`;
         const resultObj = {
           params: filteredParams,
           metrics: metricsObj,
@@ -508,13 +520,20 @@ if (fitBtn) {
           conf,
           nBoot,
           mode: 'pyodide',
+          modelLabel,
+          id: `fit-${createdAt.getTime()}-${Math.random().toString(36).slice(2, 7)}`,
+          createdAt: createdAt.toISOString(),
+          selected: true,
+          runLabel,
         };
 
         window._lastFit = resultObj;
         fitBtn.textContent = 'Processing results...';
         renderParams(resultObj);
         renderMetrics(resultObj);
-        renderChart(resultObj);
+        fitHistory.push(resultObj);
+        renderFitHistory();
+        renderChart(getSelectedFits());
         if (pdfBtn) pdfBtn.disabled = false;
         if (statusEl) statusEl.textContent = `Fit complete. Bootstrap N=${nBoot}.`;
         fitBtn.textContent = 'Fit complete';
@@ -546,19 +565,42 @@ if (fitBtn) {
 }
 
 if (pdfBtn) {
-  pdfBtn.addEventListener('click', async () => {
+  pdfBtn.addEventListener('click', () => {
+    if (!window._lastFit) return;
+    if (!reportModal) return;
+    reportModal.classList.remove('hidden');
+    reportModal.classList.add('flex');
+  });
+}
+
+function closeReportModal() {
+  if (!reportModal) return;
+  reportModal.classList.add('hidden');
+  reportModal.classList.remove('flex');
+}
+
+if (cancelReportBtn) {
+  cancelReportBtn.addEventListener('click', closeReportModal);
+}
+
+if (generateReportBtn) {
+  generateReportBtn.addEventListener('click', async () => {
     if (!window._lastFit) return;
     if (!window.jspdf || !window.jspdf.jsPDF) {
       alert('jsPDF failed to load. Please try again.');
       return;
     }
 
+    const projectName = reportProjectNameInput?.value?.trim() || 'Sample Project';
+    const clientName = reportClientInput?.value?.trim() || 'N/A';
+    const siteLocation = reportLocationInput?.value?.trim() || 'N/A';
+
     // --- START: Professional PDF Generation Logic ---
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
     const { model, r, Q, params, metrics, conf, nBoot, ci, curves } = window._lastFit;
-    const modelLabel = currentModelMeta?.name || model.toUpperCase();
+    const modelLabel = window._lastFit?.modelLabel || currentModelMeta?.name || model.toUpperCase();
     const confPercent = Math.round((conf || 0) * 100);
     let y = 0; // Y-position tracker
 
@@ -569,9 +611,9 @@ if (pdfBtn) {
 
     // --- 2. Project Information Table ---
     const projectInfo = [
-      ['Project:', 'Sample Project'],
-      ['Client:', 'N/A'],
-      ['Location:', 'N/A'],
+      ['Project:', projectName],
+      ['Client:', clientName],
+      ['Location:', siteLocation],
       ['Test Date:', new Date().toLocaleDateString()],
     ];
     doc.autoTable({
@@ -723,6 +765,15 @@ if (pdfBtn) {
 
     doc.save(`Lagwell_Report_${model}_${new Date().toISOString().slice(0, 10)}.pdf`);
     // --- END: Professional PDF Generation Logic ---
+    closeReportModal();
+  });
+}
+
+if (reportModal) {
+  reportModal.addEventListener('click', (event) => {
+    if (event.target === reportModal) {
+      closeReportModal();
+    }
   });
 }
 
@@ -866,7 +917,93 @@ function renderMetrics(result) {
   container.innerHTML = `<div class="grid gap-3 sm:grid-cols-2">${html}</div>`;
 }
 
-function renderChart(result) {
+function formatFitTimestamp(isoString) {
+  if (!isoString) return 'Just now';
+  try {
+    const date = new Date(isoString);
+    if (Number.isNaN(date.getTime())) return 'Just now';
+    return date.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch (err) {
+    console.warn('Unable to format timestamp', err);
+    return 'Just now';
+  }
+}
+
+function getSelectedFits() {
+  return fitHistory.filter((fit) => fit && fit.selected);
+}
+
+function renderFitHistory() {
+  if (!fitHistoryContainer) return;
+
+  if (clearHistoryBtn) {
+    clearHistoryBtn.disabled = fitHistory.length === 0;
+  }
+
+  if (!fitHistory.length) {
+    fitHistoryContainer.innerHTML = `
+      <div class="p-6 text-sm text-zinc-400/80 text-center">
+        <svg class="mx-auto h-12 w-12 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h16.5M3.75 3v.75A2.25 2.25 0 011.5 6v.75m19.5 0v.75a2.25 2.25 0 01-2.25 2.25h-1.5m-15 4.5h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75m16.5 4.5v8.25c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 01-1.125-1.125V10.5m16.5 4.5h.75a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75" /></svg>
+        <p class="mt-4 font-semibold">No fits yet</p>
+        <p class="mt-1 text-zinc-500">Your analysis results will appear here.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'fit-history-list divide-y divide-zinc-800/60';
+
+  fitHistory.forEach((fit) => {
+    const item = document.createElement('label');
+    item.className = 'fit-history-item flex items-center justify-between gap-4 px-4 py-3 transition-colors';
+    item.classList.toggle('is-selected', !!fit.selected);
+
+    const info = document.createElement('div');
+    info.className = 'space-y-1';
+
+    const title = document.createElement('div');
+    title.className = 'text-sm font-semibold text-zinc-100';
+    const titleParts = [fit.runLabel, fit.modelLabel];
+    title.textContent = titleParts.filter(Boolean).join(' • ') || 'Fit';
+    info.appendChild(title);
+
+    const meta = document.createElement('div');
+    meta.className = 'text-xs text-zinc-400 fit-history-meta';
+    const r2 = Number.isFinite(fit.metrics?.r2) ? fmtDec(fit.metrics.r2, 4) : '—';
+    const rmse = Number.isFinite(fit.metrics?.rmse) ? formatNumber(fit.metrics.rmse) : '—';
+    meta.innerHTML = `
+      <span class="font-medium text-zinc-300">${formatFitTimestamp(fit.createdAt)}</span>
+      · R² <span class="font-mono text-indigo-200">${r2}</span>
+      · RMSE <span class="font-mono text-sky-200">${rmse}</span>
+    `;
+    info.appendChild(meta);
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'fit-history-checkbox h-4 w-4';
+    checkbox.checked = !!fit.selected;
+    checkbox.addEventListener('change', () => {
+      fit.selected = checkbox.checked;
+      item.classList.toggle('is-selected', !!fit.selected);
+      renderChart(getSelectedFits());
+    });
+
+    item.appendChild(info);
+    item.appendChild(checkbox);
+    list.appendChild(item);
+  });
+
+  fitHistoryContainer.innerHTML = '';
+  fitHistoryContainer.appendChild(list);
+}
+
+function renderChart(fitsToRender = []) {
   const chartEl = $('#chart');
   if (!chartEl) return;
 
@@ -883,9 +1020,13 @@ function renderChart(result) {
     chartEl.innerHTML = `<div class="p-6">${message}</div>`;
   };
 
-  const obs = result.curves?.observed || [];
-  const fit = result.curves?.fitted || [];
-  if (!obs.length && !fit.length) {
+  const hasExplicitArgument = arguments.length > 0;
+  const fits = Array.isArray(fitsToRender) ? fitsToRender.filter(Boolean) : [];
+  if (!fits.length && !hasExplicitArgument && window._lastFit) {
+    fits.push(window._lastFit);
+  }
+
+  if (!fits.length) {
     showMessage('Observed and fitted curves will appear here after calibration.');
     return;
   }
@@ -898,24 +1039,42 @@ function renderChart(result) {
   chartEl.classList.remove('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
   chartEl.innerHTML = '';
 
-  const sortedObs = [...obs].sort((a, b) => a[0] - b[0]);
-  const sortedFit = [...fit].sort((a, b) => a[0] - b[0]);
-  const obsTrace = {
-    x: sortedObs.map((d) => d[0]),
-    y: sortedObs.map((d) => d[1]),
-    name: 'Observed',
-    mode: 'markers',
-    type: 'scatter',
-    marker: { color: '#818cf8', size: 8, opacity: 0.85 },
-  };
-  const fitTrace = {
-    x: sortedFit.map((d) => d[0]),
-    y: sortedFit.map((d) => d[1]),
-    name: 'Fitted',
-    mode: 'lines',
-    type: 'scatter',
-    line: { color: '#22d3ee', width: 3 },
-  };
+  const palette = ['#22d3ee', '#a855f7', '#f97316', '#38bdf8', '#f43f5e', '#14b8a6'];
+  const traces = [];
+
+  const baseFit = fits[0];
+  const observed = Array.isArray(baseFit?.curves?.observed) ? [...baseFit.curves.observed] : [];
+  if (observed.length) {
+    const sortedObs = observed.sort((a, b) => a[0] - b[0]);
+    traces.push({
+      x: sortedObs.map((d) => d[0]),
+      y: sortedObs.map((d) => d[1]),
+      name: 'Observed',
+      mode: 'markers',
+      type: 'scatter',
+      marker: { color: '#94a3b8', size: 8, opacity: 0.85 },
+    });
+  }
+
+  fits.forEach((fit, idx) => {
+    const sortedFit = Array.isArray(fit.curves?.fitted) ? [...fit.curves.fitted].sort((a, b) => a[0] - b[0]) : [];
+    if (!sortedFit.length) return;
+    const color = palette[idx % palette.length];
+    const r2 = Number.isFinite(fit.metrics?.r2) ? fmtDec(fit.metrics.r2, 3) : null;
+    const legendLabelParts = [fit.runLabel, fit.modelLabel];
+    if (r2 != null) {
+      legendLabelParts.push(`R² ${r2}`);
+    }
+    traces.push({
+      x: sortedFit.map((d) => d[0]),
+      y: sortedFit.map((d) => d[1]),
+      name: legendLabelParts.filter(Boolean).join(' • '),
+      mode: 'lines',
+      type: 'scatter',
+      line: { color, width: 3 },
+    });
+  });
+
   const layout = {
     paper_bgcolor: 'rgba(0,0,0,0)',
     plot_bgcolor: 'rgba(0,0,0,0)',
@@ -933,7 +1092,13 @@ function renderChart(result) {
     },
     legend: { orientation: 'h', y: -0.25 },
   };
-  const config = { displayModeBar: false, responsive: true };
+  const config = {
+    responsive: true,
+    scrollZoom: true,
+    displayModeBar: true,
+    modeBarButtonsToRemove: ['select2d', 'lasso2d', 'sendDataToCloud'],
+    displaylogo: false,
+  };
 
   const plotter = chartEl.dataset.hasPlot === '1' && typeof window.Plotly.react === 'function'
     ? window.Plotly.react
@@ -945,7 +1110,7 @@ function renderChart(result) {
   };
 
   try {
-    const maybePromise = plotter(chartEl, [obsTrace, fitTrace], layout, config);
+    const maybePromise = plotter(chartEl, traces, layout, config);
     if (maybePromise && typeof maybePromise.then === 'function') {
       maybePromise
         .then(() => {
@@ -958,6 +1123,19 @@ function renderChart(result) {
   } catch (err) {
     handleError(err);
   }
+}
+
+renderFitHistory();
+
+if (clearHistoryBtn) {
+  clearHistoryBtn.addEventListener('click', () => {
+    fitHistory = [];
+    window._lastFit = null;
+    renderFitHistory();
+    renderChart([]);
+    if (pdfBtn) pdfBtn.disabled = true;
+    if (statusEl) statusEl.textContent = 'History cleared. Ready for new fit.';
+  });
 }
 
 function formatNumber(value, digits = 3) {
