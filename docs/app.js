@@ -578,10 +578,15 @@ function renderChart(result) {
   const obs = result.curves?.observed || [];
   const fit = result.curves?.fitted || [];
   if (!obs.length && !fit.length) {
-    chartEl.innerHTML = '<div class="p-6 text-sm text-zinc-500">Observed and fitted curves will appear here after calibration.</div>';
+    if (window.Plotly && chartEl.data) {
+      window.Plotly.purge(chartEl);
+    }
+    chartEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
+    chartEl.innerHTML = '<div class="p-6">Observed and fitted curves will appear here after calibration.</div>';
     return;
   }
 
+  chartEl.classList.remove('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
   chartEl.innerHTML = '';
   const sortedObs = [...obs].sort((a, b) => a[0] - b[0]);
   const sortedFit = [...fit].sort((a, b) => a[0] - b[0]);

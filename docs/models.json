@@ -27,7 +27,8 @@
     ],
     "assumptions": [
       "Phase-lagged response with skin and wellbore storage neglected",
-      "Use for early-time delayed yield analysis"
+      "Use for early-time delayed yield analysis",
+      "Inertial term j is fixed to zero in the UI; advanced users can enable it via the API"
     ]
   }
 }

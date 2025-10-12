@@ -324,26 +324,46 @@ def fit_model(
     draws_sorted = draws[order]
 
     priors = priors or {}
+    fit_j = bool(kwargs.pop("fit_j", False))
 
     if model_name == 'lagging':
         log_init, j_init = _initial_guess(model_name, times_sorted, draws_sorted)
         logT0, logS0, log_tau_q0, log_tau_s0 = log_init
-        j0 = priors.get('j', j_init)
 
-        def residual(theta, t_arr, draw_arr, radius, rate):
-            logT, logS, log_tau_q, log_tau_s, j_param = theta
-            T = np.exp(logT)
-            S = np.exp(logS)
-            tau_q = np.exp(log_tau_q)
-            tau_s = np.exp(log_tau_s)
-            pred = lagging_drawdown_time(t_arr, T, S, tau_q, tau_s, radius, rate, j_param)
-            return pred - draw_arr
+        if fit_j:
 
-        x0 = np.array([logT0, logS0, log_tau_q0, log_tau_s0, j0])
-        bounds = (
-            np.array([np.log(1e-8), np.log(1e-10), np.log(1e-6), np.log(1e-6), -1.0]),
-            np.array([np.log(1e4), np.log(1.0), np.log(1e6), np.log(1e6), 1.0]),
-        )
+            def residual(theta, t_arr, draw_arr, radius, rate):
+                logT, logS, log_tau_q, log_tau_s, j_param = theta
+                T = np.exp(logT)
+                S = np.exp(logS)
+                tau_q = np.exp(log_tau_q)
+                tau_s = np.exp(log_tau_s)
+                pred = lagging_drawdown_time(t_arr, T, S, tau_q, tau_s, radius, rate, j_param)
+                return pred - draw_arr
+
+            j0 = priors.get('j', j_init)
+            x0 = np.array([logT0, logS0, log_tau_q0, log_tau_s0, j0])
+            bounds = (
+                np.array([np.log(1e-8), np.log(1e-10), np.log(1e-6), np.log(1e-6), -1.0]),
+                np.array([np.log(1e4), np.log(1.0), np.log(1e6), np.log(1e6), 1.0]),
+            )
+        else:
+
+            def residual(theta, t_arr, draw_arr, radius, rate):
+                logT, logS, log_tau_q, log_tau_s = theta
+                T = np.exp(logT)
+                S = np.exp(logS)
+                tau_q = np.exp(log_tau_q)
+                tau_s = np.exp(log_tau_s)
+                pred = lagging_drawdown_time(t_arr, T, S, tau_q, tau_s, radius, rate)
+                return pred - draw_arr
+
+            x0 = np.array([logT0, logS0, log_tau_q0, log_tau_s0])
+            bounds = (
+                np.array([np.log(1e-8), np.log(1e-10), np.log(1e-6), np.log(1e-6)]),
+                np.array([np.log(1e4), np.log(1.0), np.log(1e6), np.log(1e6)]),
+            )
+
         lsq_args = (times_sorted, draws_sorted, r, Q)
     elif model_name == 'theis':
         logT0, logS0 = _initial_guess(model_name, times_sorted, draws_sorted)
@@ -373,15 +393,42 @@ def fit_model(
     result = least_squares(residual, x0, bounds=bounds, max_nfev=600, args=args)
 
     if model_name == 'lagging':
-        logT, logS, log_tau_q, log_tau_s, j_param = result.x
-        params = {
-            'T': float(np.exp(logT)),
-            'S': float(np.exp(logS)),
-            'tau_q': float(np.exp(log_tau_q)),
-            'tau_s': float(np.exp(log_tau_s)),
-            'j': float(np.clip(j_param, -1.0, 1.0)),
-        }
-        fitted = lagging_drawdown_time(times_sorted, params['T'], params['S'], params['tau_q'], params['tau_s'], r, Q, params['j'])
+        if fit_j:
+            logT, logS, log_tau_q, log_tau_s, j_param = result.x
+            params = {
+                'T': float(np.exp(logT)),
+                'S': float(np.exp(logS)),
+                'tau_q': float(np.exp(log_tau_q)),
+                'tau_s': float(np.exp(log_tau_s)),
+                'j': float(np.clip(j_param, -1.0, 1.0)),
+            }
+            fitted = lagging_drawdown_time(
+                times_sorted,
+                params['T'],
+                params['S'],
+                params['tau_q'],
+                params['tau_s'],
+                r,
+                Q,
+                params['j'],
+            )
+        else:
+            logT, logS, log_tau_q, log_tau_s = result.x
+            params = {
+                'T': float(np.exp(logT)),
+                'S': float(np.exp(logS)),
+                'tau_q': float(np.exp(log_tau_q)),
+                'tau_s': float(np.exp(log_tau_s)),
+            }
+            fitted = lagging_drawdown_time(
+                times_sorted,
+                params['T'],
+                params['S'],
+                params['tau_q'],
+                params['tau_s'],
+                r,
+                Q,
+            )
     else:
         logT, logS = result.x
         params = {
@@ -417,6 +464,9 @@ def bootstrap_fit(
 ) -> Dict[str, Dict[str, Sequence[float]]]:
     """Residual bootstrap confidence intervals for fitted parameters."""
 
+    kwargs = dict(kwargs)
+    fit_j = bool(kwargs.pop('fit_j', False))
+
     times_arr = _ensure_array(times)
     draws_arr = _ensure_array(draws)
     if len(times_arr) != len(draws_arr):
@@ -437,6 +487,7 @@ def bootstrap_fit(
             Q,
             priors=priors,
             conf=conf,
+            fit_j=fit_j,
             **kwargs,
         )
     else:
@@ -474,6 +525,7 @@ def bootstrap_fit(
             Q,
             priors=priors,
             conf=conf,
+            fit_j=fit_j,
             **kwargs,
         )
         for key, value in params_b.items():
