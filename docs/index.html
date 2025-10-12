@@ -9,7 +9,32 @@
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [
+          ['$', '$'],
+          ['\\(', '\\)']
+        ],
+        displayMath: [
+          ['$$', '$$'],
+          ['\\[', '\\]']
+        ],
+        tags: 'ams'
+      },
+      svg: {
+        fontCache: 'global',
+        linebreaks: {
+          automatic: true,
+          width: 'container'
+        }
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
 </head>
 <body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
   <div class="max-w-6xl mx-auto px-4 py-10 space-y-12">
@@ -75,7 +100,7 @@
             </label>
           </div>
 
-          <div id="modelDetails" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 space-y-4 text-sm text-zinc-300">
+          <div id="modelDetails" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 space-y-4 text-sm text-zinc-300 overflow-visible">
             <p>Select a model to see formulas, parameters, and assumptions.</p>
           </div>
 

@@ -24,16 +24,6 @@
   color: rgb(228, 228, 231);
 }
 
-.model-details-list {
-  list-style: none;
-  padding-left: 0;
-  margin: 0;
-}
-
-.model-details-list li + li {
-  margin-top: 0.5rem;
-}
-
 .model-assumptions {
   list-style: disc;
   padding-left: 1.25rem;
@@ -44,11 +34,6 @@
   margin-top: 0.35rem;
 }
 
-.model-formula {
-  font-size: 1.05rem;
-  color: rgb(196, 203, 255);
-}
-
 #chart {
   min-height: 18rem;
 }
@@ -57,6 +42,38 @@
   background-color: rgba(16, 185, 129, 0.18);
   border-color: rgba(16, 185, 129, 0.35);
   color: rgb(190, 242, 230);
+}
+
+.mjx-container {
+  max-width: 100%;
+}
+
+.math-block .mjx-container {
+  margin-left: 0;
+}
+
+.math-block {
+  overflow: hidden;
+}
+
+.param-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.75rem;
+}
+
+.param-row + .param-row {
+  margin-top: 0.75rem;
+}
+
+.param-row .badge {
+  align-self: start;
+}
+
+@media (max-width: 640px) {
+  .mjx-container {
+    font-size: 0.95rem;
+  }
 }
 
 input[type="file"]::-webkit-file-upload-button,

@@ -10,8 +10,39 @@ const nBootSelect = $('#nBoot');
 
 let modelsCache = null;
 let currentModelMeta = null;
+let modelDetailsRenderToken = 0;
 let pyodideInstance = null;
 let solverLoaded = false;
+
+async function typesetNow(node) {
+  if (!node || !window.MathJax) return;
+  try {
+    if (window.MathJax.startup?.promise) {
+      await window.MathJax.startup.promise;
+    }
+    if (typeof window.MathJax.typesetPromise === 'function') {
+      await window.MathJax.typesetPromise([node]);
+    }
+  } catch (err) {
+    console.warn('MathJax typeset failed:', err);
+  }
+}
+
+function latexToPlain(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/\s+/g, ' ')
+    .replace(/^\s*\\\[(.*)\\\]\s*$/s, '$1')
+    .replace(/^\s*\\\((.*)\\\)\s*$/s, '$1')
+    .replace(/^\s*\${1,2}(.*)\${1,2}\s*$/s, '$1')
+    .replace(/\\mathrm\{([^}]*)\}/g, '$1')
+    .replace(/\\text\{([^}]*)\}/g, '$1')
+    .replace(/\\tau/g, 'τ')
+    .replace(/\\pi/g, 'π')
+    .replace(/\\,/g, ' ')
+    .replace(/\\/g, '')
+    .trim();
+}
 
 async function loadModelMetadata() {
   if (modelsCache) return modelsCache;
@@ -25,8 +56,12 @@ async function loadModelMetadata() {
 
 async function renderModelDetails(modelId) {
   if (!modelDetailsEl) return;
+  const token = ++modelDetailsRenderToken;
   try {
     const models = await loadModelMetadata();
+    if (token !== modelDetailsRenderToken) {
+      return;
+    }
     const model = models?.[modelId];
     currentModelMeta = model || null;
     if (!model) {
@@ -36,18 +71,25 @@ async function renderModelDetails(modelId) {
 
     const paramsHtml = (model.parameters || [])
       .map((param) => {
-        const units = param.units ? ` <span class="text-xs font-normal text-zinc-500">(${param.units})</span>` : '';
-        const badge = param.estimate
-          ? '<span class="badge estimate">Estimated</span>'
-          : '<span class="badge fixed">Fixed</span>';
+        const latex = param.latex || param.symbol || param.key || '';
+        const units = param.units
+          ? `<div class="math text-xs text-zinc-400">${param.units}</div>`
+          : '';
+        const desc = param.desc || param.description || '';
+        const estimated = Boolean(param.estimated ?? param.estimate);
+        const badgeLabel = estimated ? 'Estimated' : 'Fixed';
+        const badgeClass = estimated ? 'badge estimate' : 'badge fixed';
         return `
-          <li class="flex items-start justify-between gap-3">
-            <div>
-              <div class="text-sm font-semibold text-zinc-100">${param.symbol}${units}</div>
-              <div class="text-xs text-zinc-400 mt-1">${param.description}</div>
+          <div class="param-row grid grid-cols-[auto_1fr] items-start gap-3">
+            <div class="math text-lg font-semibold text-indigo-100/90 leading-tight">${latex}</div>
+            <div class="space-y-1">
+              <div class="flex items-center justify-between gap-3">
+                <span class="text-sm font-medium text-zinc-100">${desc}</span>
+                <span class="${badgeClass}">${badgeLabel}</span>
+              </div>
+              ${units}
             </div>
-            ${badge}
-          </li>
+          </div>
         `;
       })
       .join('');
@@ -56,15 +98,23 @@ async function renderModelDetails(modelId) {
       .map((item) => `<li>${item}</li>`)
       .join('');
 
+    const formulaBlock = model.formula
+      ? `<div class="math-block text-indigo-100/90">${model.formula}</div>`
+      : '';
+
+    if (token !== modelDetailsRenderToken) {
+      return;
+    }
+
     modelDetailsEl.innerHTML = `
-      <div class="space-y-4">
+      <div class="space-y-5">
         <div class="space-y-2">
           <h3 class="text-lg font-semibold text-zinc-100">${model.name}</h3>
-          <div class="math model-formula">$$ ${model.formula} $$</div>
+          ${formulaBlock || '<p class="text-sm text-zinc-400">Formula not provided.</p>'}
         </div>
         <div class="space-y-2">
           <h4 class="text-xs uppercase tracking-[0.2em] text-zinc-500">Parameters</h4>
-          <ul class="model-details-list space-y-3">${paramsHtml || '<li class="text-sm text-zinc-400">No parameter metadata.</li>'}</ul>
+          <div class="space-y-3">${paramsHtml || '<p class="text-sm text-zinc-400">No parameter metadata.</p>'}</div>
         </div>
         <div class="space-y-2">
           <h4 class="text-xs uppercase tracking-[0.2em] text-zinc-500">Assumptions</h4>
@@ -73,9 +123,28 @@ async function renderModelDetails(modelId) {
       </div>
     `;
 
-    if (window.MathJax && typeof window.MathJax.typeset === 'function') {
-      window.MathJax.typeset();
+    const detailsList = modelDetailsEl.querySelectorAll('details');
+    detailsList.forEach((detailsEl) => {
+      detailsEl.addEventListener('toggle', async () => {
+        if (detailsEl.open) {
+          await typesetNow(detailsEl);
+        }
+      });
+    });
+
+    const parentDetails = modelDetailsEl.closest('details');
+    if (parentDetails && !parentDetails.open) {
+      const handler = async () => {
+        if (parentDetails.open) {
+          parentDetails.removeEventListener('toggle', handler);
+          await typesetNow(modelDetailsEl);
+        }
+      };
+      parentDetails.addEventListener('toggle', handler);
+      return;
     }
+
+    await typesetNow(modelDetailsEl);
   } catch (err) {
     console.error(err);
     modelDetailsEl.innerHTML = `<p class="text-sm text-rose-300">Failed to load model metadata: ${err.message}</p>`;
@@ -421,16 +490,22 @@ function renderParams(result) {
   const confLabel = `${Math.round((result.conf ?? 0) * 100)}% CI`;
 
   const rows = Object.keys(params).map((key) => {
-    const meta = metaParams.find((p) => p.symbol === key);
-    const description = meta?.description ? `<div class="text-xs text-zinc-500 mt-1">${meta.description}</div>` : '';
-    const units = meta?.units ? ` <span class="text-xs font-normal text-zinc-500">(${meta.units})</span>` : '';
+    const meta = metaParams.find((p) => p.key === key || p.symbol === key);
+    const descriptionText = meta?.desc || meta?.description;
+    const description = descriptionText
+      ? `<div class="text-xs text-zinc-500 mt-1">${descriptionText}</div>`
+      : '';
+    const unitsText = meta?.units ? latexToPlain(meta.units) : '';
+    const units = unitsText ? ` <span class="text-xs font-normal text-zinc-500">(${unitsText})</span>` : '';
+    const labelLatex = meta?.latex || meta?.symbol;
+    const label = labelLatex ? latexToPlain(labelLatex) : key;
     const ciPair = Array.isArray(ci[key]) && ci[key].length === 2
       ? `[${fmtExp(ci[key][0])}, ${fmtExp(ci[key][1])}]`
       : '—';
     return `
       <tr>
         <td class="px-4 py-3 align-top">
-          <div class="font-semibold text-zinc-100">${meta?.symbol || key}${units}</div>
+          <div class="font-semibold text-zinc-100">${label}${units}</div>
           ${description}
         </td>
         <td class="px-4 py-3 font-mono text-sm text-indigo-100">${fmtExp(params[key])}</td>
