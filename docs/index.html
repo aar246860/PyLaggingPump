@@ -57,6 +57,13 @@
   <a id="docLink" href="./overview.html" aria-label="Open documentation">Overview</a>
   <div class="max-w-6xl mx-auto px-4 py-10 space-y-12">
     <header class="space-y-6">
+      <nav class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between border-b border-zinc-800">
+        <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
+        <div class="flex items-center gap-4 text-sm">
+          <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
+          <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
+        </div>
+      </nav>
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
         <div class="space-y-3 md:max-w-2xl">
           <p class="text-sm uppercase tracking-[0.35em] text-indigo-400/80">Lagwell</p>
@@ -99,6 +106,7 @@
               <select id="model" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
                 <option value="lagging" selected>Lagging</option>
                 <option value="theis">Theis</option>
+                <option value="fractured" disabled>Fractured Aquifer Model ✨ (Pro)</option>
               </select>
             </label>
             <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
@@ -131,6 +139,11 @@
               <div class="flex items-end">
                 <button id="loadExample" type="button" class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
                   Load example dataset
+                </button>
+              </div>
+              <div class="sm:col-span-2">
+                <button type="button" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-500 bg-zinc-800/30 cursor-not-allowed" title="Coming Soon">
+                  Import from Datalogger ✨ (Pro)
                 </button>
               </div>
             </div>
@@ -184,8 +197,12 @@
       </div>
     </main>
 
-    <footer class="text-sm text-zinc-500 text-center md:text-left">
-      <strong>Disclaimer:</strong> Research/educational tool. Not certified for field use.
+    <footer class="text-sm text-zinc-500 text-center space-y-2 py-8">
+      <p><strong>Disclaimer:</strong> This tool is for research/educational use only. Not certified for field use.</p>
+      <div class="flex justify-center gap-6">
+        <a href="https://github.com/aar246860/PyLaggingPump" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">GitHub Source</a>
+        <a href="https://github.com/aar246860/PyLaggingPump/issues" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">Report an Issue</a>
+      </div>
     </footer>
   </div>
   <div class="app-docs-footer">
