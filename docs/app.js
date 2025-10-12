@@ -3,6 +3,7 @@ const $ = (sel) => document.querySelector(sel);
 const pyStatus = $('#pyStatus');
 let pyodideInstance = null;
 let solverLoaded = false;
+let fitPy = null;
 
 async function ensurePyodide() {
   if (pyodideInstance && solverLoaded) {
@@ -40,6 +41,10 @@ async function ensurePyodide() {
       const code = await (await fetch('./py/solver.py')).text();
       await pyodideInstance.runPythonAsync(code);
       solverLoaded = true;
+      if (fitPy && typeof fitPy.destroy === 'function') {
+        fitPy.destroy();
+      }
+      fitPy = pyodideInstance.globals.get('fit_model');
       if (pyStatus) {
         pyStatus.textContent = 'Python ready（瀏覽器端運算）';
         pyStatus.classList.add('ready');
@@ -51,6 +56,10 @@ async function ensurePyodide() {
       }
       throw err;
     }
+  }
+
+  if (!fitPy) {
+    fitPy = pyodideInstance.globals.get('fit_model');
   }
 
   return pyodideInstance;
@@ -95,56 +104,51 @@ $('#fitBtn').addEventListener('click', async () => {
 
     const pyTimes = py.toPy(Array.from(times));
     const pyDraws = py.toPy(Array.from(draws));
-    const pyModel = py.toPy(model);
 
-    let jsonStr = '';
+    let pyResult = null;
+    const pyproxies = [];
     try {
-      py.globals.set('times_js', pyTimes);
-      py.globals.set('draws_js', pyDraws);
-      py.globals.set('model_js', pyModel);
-      py.globals.set('r_js', _r);
-      py.globals.set('Q_js', _Q);
+      if (!fitPy || typeof fitPy.call !== 'function') {
+        fitPy = py.globals.get('fit_model');
+      }
+      if (!fitPy || typeof fitPy.call !== 'function') {
+        throw new Error('fit_model 尚未載入');
+      }
+      pyResult = fitPy(pyTimes, pyDraws, model, _r, _Q);
+      const fitResult = pyResult.toJs({ pyproxies, dict_converter: Object.fromEntries });
+      try {
+        const [params = {}, metrics = {}, fitted = []] = Array.isArray(fitResult) ? fitResult : [];
+        const resultObj = {
+          params: params || {},
+          metrics: metrics || {},
+          ci: {},
+          curves: {
+            observed: times.map((t, idx) => [t, draws[idx]]),
+            fitted: Array.isArray(fitted) ? fitted : [],
+          },
+          model,
+          r: _r,
+          Q: _Q,
+          conf,
+          mode: 'pyodide',
+        };
 
-      jsonStr = await py.runPythonAsync(`
-import json
-from js import times_js, draws_js, model_js, r_js, Q_js
-import numpy as np
-
-times = np.array(times_js, dtype=float)
-draws = np.array(draws_js, dtype=float)
-params, metrics, fitted = fit_model(times, draws, str(model_js), float(r_js), float(Q_js))
-json.dumps({"params": params, "metrics": metrics, "fitted": fitted})
-      `);
+        window._lastFit = resultObj;
+        renderParams(resultObj);
+        renderChart(resultObj);
+        $('#pdfBtn').disabled = false;
+        $('#status').textContent = '完成（瀏覽器端 Python）';
+      } finally {
+        for (const p of pyproxies) {
+          if (p && typeof p.destroy === 'function') p.destroy();
+        }
+        if (pyResult && typeof pyResult.destroy === 'function') pyResult.destroy();
+      }
     } finally {
-      ['times_js', 'draws_js', 'model_js', 'r_js', 'Q_js'].forEach((name) => {
-        try { py.globals.delete(name); } catch (_) {}
-      });
-      if (pyTimes) pyTimes.destroy();
-      if (pyDraws) pyDraws.destroy();
-      if (pyModel) pyModel.destroy();
+      if (pyTimes && typeof pyTimes.destroy === 'function') pyTimes.destroy();
+      if (pyDraws && typeof pyDraws.destroy === 'function') pyDraws.destroy();
     }
 
-    const parsedResult = JSON.parse(jsonStr);
-    const resultObj = {
-      params: parsedResult.params || {},
-      metrics: parsedResult.metrics || {},
-      ci: {},
-      curves: {
-        observed: times.map((t, idx) => [t, draws[idx]]),
-        fitted: parsedResult.fitted || [],
-      },
-      model,
-      r: _r,
-      Q: _Q,
-      conf,
-      mode: 'pyodide',
-    };
-
-    window._lastFit = resultObj;
-    renderParams(resultObj);
-    renderChart(resultObj);
-    $('#pdfBtn').disabled = false;
-    $('#status').textContent = '完成（瀏覽器端 Python）';
   } catch (err) {
     console.error(err);
     $('#status').textContent = '錯誤：' + err.message;
@@ -289,3 +293,10 @@ function formatNumber(value, digits = 3) {
   }
   return Number(value).toFixed(digits);
 }
+
+window.addEventListener('unload', () => {
+  if (fitPy && typeof fitPy.destroy === 'function') {
+    fitPy.destroy();
+  }
+  fitPy = null;
+});
