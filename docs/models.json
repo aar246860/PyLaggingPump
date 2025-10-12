@@ -1,0 +1,33 @@
+{
+  "theis": {
+    "id": "theis",
+    "name": "Theis (Confined Aquifer)",
+    "parameters": [
+      { "symbol": "T", "units": "m^2/day", "description": "Transmissivity", "estimate": true },
+      { "symbol": "S", "units": "-", "description": "Storage Coefficient", "estimate": true },
+      { "symbol": "Q_w", "units": "m^3/day", "description": "Pumping Rate", "estimate": false }
+    ],
+    "formula": "s(t,r) = \\frac{Q_w}{4\\pi T}\\,W(u),\\quad u=\\frac{Sr^2}{4 T t},\\;W(u)=E_1(u)",
+    "assumptions": [
+      "Homogeneous, isotropic, confined aquifer of infinite extent",
+      "Fully penetrating well, constant pumping rate",
+      "Negligible wellbore storage"
+    ]
+  },
+  "lagging": {
+    "id": "lagging",
+    "name": "Lagging Model (Lin & Yeh 2017)",
+    "parameters": [
+      { "symbol": "T", "units": "m^2/day", "description": "Transmissivity", "estimate": true },
+      { "symbol": "S", "units": "-", "description": "Storativity", "estimate": true },
+      { "symbol": "τ_q", "units": "time", "description": "Flux phase lag", "estimate": true },
+      { "symbol": "τ_s", "units": "time", "description": "Drawdown gradient lag", "estimate": true },
+      { "symbol": "Q_w", "units": "m^3/day", "description": "Pumping Rate", "estimate": false }
+    ],
+    "formula": "s(t,r) = \\mathcal{L}^{-1}\\left\\{ B(p)\\,K_0\\big(k(p)\\,r\\big) \\right\\},\\quad k(p)=\\sqrt{\\dfrac{p + j(1+p\\,\\tau_q)}{1+p\\,\\tau_s}}",
+    "assumptions": [
+      "Leaky/heterogeneous responses represented via phase lag in flux and gradient",
+      "Early-time delayed yield captured by τ_q, τ_s; neglect skin and wellbore storage in MVP"
+    ]
+  }
+}

@@ -263,42 +263,47 @@ def fit_model(
         logT0, logS0, log_tau_q0, log_tau_s0 = log_init
         j0 = priors.get('j', j_init)
 
-        def residual(theta):
+        def residual(theta, t_arr, draw_arr, radius, rate):
             logT, logS, log_tau_q, log_tau_s, j_param = theta
             T = np.exp(logT)
             S = np.exp(logS)
             tau_q = np.exp(log_tau_q)
             tau_s = np.exp(log_tau_s)
-            pred = lagging_drawdown_time(times_sorted, T, S, tau_q, tau_s, r, Q, j_param)
-            return pred - draws_sorted
+            pred = lagging_drawdown_time(t_arr, T, S, tau_q, tau_s, radius, rate, j_param)
+            return pred - draw_arr
 
         x0 = np.array([logT0, logS0, log_tau_q0, log_tau_s0, j0])
         bounds = (
             np.array([np.log(1e-8), np.log(1e-10), np.log(1e-6), np.log(1e-6), -1.0]),
             np.array([np.log(1e4), np.log(1.0), np.log(1e6), np.log(1e6), 1.0]),
         )
+        lsq_args = (times_sorted, draws_sorted, r, Q)
     elif model_name == 'theis':
         logT0, logS0 = _initial_guess(model_name, times_sorted, draws_sorted)
 
-        def residual(theta):
+        def residual(theta, t_arr, draw_arr, radius, rate):
             logT, logS = theta
             T = np.exp(logT)
             S = np.exp(logS)
-            pred = theis_drawdown(times_sorted, T, S, r, Q)
-            return pred - draws_sorted
+            pred = theis_drawdown(t_arr, T, S, radius, rate)
+            return pred - draw_arr
 
         x0 = np.array([logT0, logS0])
         bounds = (
             np.array([np.log(1e-8), np.log(1e-10)]),
             np.array([np.log(1e4), np.log(1.0)]),
         )
+        lsq_args = (times_sorted, draws_sorted, r, Q)
     else:
         raise ValueError(f'Unsupported model: {model_name}')
 
     extra_args = kwargs.get("lsq_args", ())
     if extra_args is None:
         extra_args = ()
-    result = least_squares(residual, x0, bounds=bounds, max_nfev=600, args=extra_args)
+    if not isinstance(extra_args, tuple):
+        extra_args = tuple(extra_args)
+    args = lsq_args + extra_args
+    result = least_squares(residual, x0, bounds=bounds, max_nfev=600, args=args)
 
     if model_name == 'lagging':
         logT, logS, log_tau_q, log_tau_s, j_param = result.x
@@ -309,7 +314,7 @@ def fit_model(
             'tau_s': float(np.exp(log_tau_s)),
             'j': float(np.clip(j_param, -1.0, 1.0)),
         }
-        fitted = lagging_drawdown_time(times_sorted, **params, r=r, Q=Q)
+        fitted = lagging_drawdown_time(times_sorted, params['T'], params['S'], params['tau_q'], params['tau_s'], r, Q, params['j'])
     else:
         logT, logS = result.x
         params = {
@@ -328,3 +333,131 @@ def fit_model(
     fitted_curve = [[float(t), float(s)] for t, s in zip(times_sorted, fitted)]
 
     return params, metrics, fitted_curve
+
+
+def bootstrap_fit(
+    times: Sequence[float],
+    draws: Sequence[float],
+    model_name: str,
+    r: float,
+    Q: float,
+    priors: Dict[str, float] | None = None,
+    conf: float = 0.95,
+    n_boot: int = 100,
+    seed: int | None = None,
+    base_fit: Tuple[Dict[str, float], Sequence[Tuple[float, float]]] | None = None,
+    **kwargs,
+) -> Dict[str, Dict[str, Sequence[float]]]:
+    """Residual bootstrap confidence intervals for fitted parameters."""
+
+    times_arr = _ensure_array(times)
+    draws_arr = _ensure_array(draws)
+    if len(times_arr) != len(draws_arr):
+        raise ValueError('times and draws must have same length')
+
+    order = np.argsort(times_arr)
+    times_sorted = times_arr[order]
+    draws_sorted = draws_arr[order]
+
+    priors = priors or {}
+
+    if base_fit is None:
+        base_params, _, base_curve = fit_model(
+            times_sorted,
+            draws_sorted,
+            model_name,
+            r,
+            Q,
+            priors=priors,
+            conf=conf,
+            **kwargs,
+        )
+    else:
+        base_params, base_curve = base_fit
+
+    base_curve = list(base_curve or [])
+    if not base_curve:
+        raise ValueError('Base fit did not return curve values for bootstrap')
+
+    base_times = np.array([float(pt[0]) for pt in base_curve], dtype=float)
+    base_values = np.array([float(pt[1]) for pt in base_curve], dtype=float)
+
+    if base_times.shape != base_values.shape:
+        raise ValueError('Malformed fitted curve data')
+
+    residuals = draws_sorted - base_values
+    if residuals.size == 0:
+        raise ValueError('Not enough data for bootstrap')
+
+    rng = np.random.default_rng(seed)
+    alpha = max(0.0, min(1.0, 1.0 - float(conf)))
+    lower_pct = 100.0 * (alpha / 2.0)
+    upper_pct = 100.0 * (1.0 - alpha / 2.0)
+
+    n_boot = int(max(0, n_boot))
+    samples: Dict[str, list[float]] = {key: [] for key in base_params.keys()}
+
+    for _ in range(n_boot):
+        draws_star = base_values + rng.choice(residuals, size=residuals.size, replace=True)
+        params_b, _, _ = fit_model(
+            times_sorted,
+            draws_star,
+            model_name,
+            r,
+            Q,
+            priors=priors,
+            conf=conf,
+            **kwargs,
+        )
+        for key, value in params_b.items():
+            samples.setdefault(key, []).append(float(value))
+
+    ci: Dict[str, Sequence[float]] = {}
+    for key, values in samples.items():
+        if not values:
+            continue
+        arr = np.asarray(values, dtype=float)
+        ci[key] = [
+            float(np.percentile(arr, lower_pct)),
+            float(np.percentile(arr, upper_pct)),
+        ]
+
+    return {'ci': ci, 'samples': samples}
+
+
+def fit_with_ci(
+    times: Sequence[float],
+    draws: Sequence[float],
+    model_name: str,
+    r: float,
+    Q: float,
+    priors: Dict[str, float] | None = None,
+    conf: float = 0.95,
+    n_boot: int = 100,
+    **kwargs,
+):
+    """Fit model and compute bootstrap confidence intervals."""
+
+    params, metrics, fitted = fit_model(
+        times,
+        draws,
+        model_name,
+        r,
+        Q,
+        priors=priors,
+        conf=conf,
+        **kwargs,
+    )
+    ci = bootstrap_fit(
+        times,
+        draws,
+        model_name,
+        r,
+        Q,
+        priors=priors,
+        conf=conf,
+        n_boot=n_boot,
+        base_fit=(params, fitted),
+        **kwargs,
+    )['ci']
+    return params, metrics, fitted, ci
