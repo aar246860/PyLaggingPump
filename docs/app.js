@@ -158,6 +158,34 @@ if (modelSelect) {
   });
 }
 
+function getModelParamKeySet(modelMeta) {
+  const paramList = Array.isArray(modelMeta?.parameters) ? modelMeta.parameters : [];
+  const keys = paramList
+    .map((param) => (param && typeof param.key === 'string' ? param.key : param?.symbol))
+    .filter((key) => typeof key === 'string' && key.trim().length > 0);
+  return new Set(keys);
+}
+
+function filterParamsForModel(rawParams, rawCi, modelMeta) {
+  const params = rawParams && typeof rawParams === 'object' ? rawParams : {};
+  const ci = rawCi && typeof rawCi === 'object' ? rawCi : {};
+  const allowed = getModelParamKeySet(modelMeta);
+  if (!allowed.size) {
+    return { params, ci };
+  }
+
+  const filteredParams = {};
+  const filteredCi = {};
+  Object.keys(params).forEach((key) => {
+    if (!allowed.has(key)) return;
+    filteredParams[key] = params[key];
+    if (Object.prototype.hasOwnProperty.call(ci, key)) {
+      filteredCi[key] = ci[key];
+    }
+  });
+  return { params: filteredParams, ci: filteredCi };
+}
+
 async function ensurePyodide() {
   if (pyodideInstance && solverLoaded) {
     return pyodideInstance;
@@ -288,10 +316,12 @@ if (fitBtn) {
         });
         const fitResult = resultPy.toJs({ pyproxies, dict_converter: Object.fromEntries });
         const [params = {}, metrics = {}, fitted = [], ci = {}] = Array.isArray(fitResult) ? fitResult : [];
+        const { params: filteredParams, ci: filteredCi } = filterParamsForModel(params, ci, currentModelMeta);
+        const metricsObj = metrics && typeof metrics === 'object' ? metrics : {};
         const resultObj = {
-          params: params || {},
-          metrics: metrics || {},
-          ci: ci || {},
+          params: filteredParams,
+          metrics: metricsObj,
+          ci: filteredCi,
           curves: {
             observed: times.map((t, idx) => [t, draws[idx]]),
             fitted: Array.isArray(fitted) ? fitted : [],
@@ -575,19 +605,35 @@ function renderMetrics(result) {
 function renderChart(result) {
   const chartEl = $('#chart');
   if (!chartEl) return;
+
+  const showMessage = (message) => {
+    if (window.Plotly && typeof window.Plotly.purge === 'function') {
+      try {
+        window.Plotly.purge(chartEl);
+      } catch (purgeErr) {
+        console.warn('Plotly purge failed:', purgeErr);
+      }
+    }
+    delete chartEl.dataset.hasPlot;
+    chartEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
+    chartEl.innerHTML = `<div class="p-6">${message}</div>`;
+  };
+
   const obs = result.curves?.observed || [];
   const fit = result.curves?.fitted || [];
   if (!obs.length && !fit.length) {
-    if (window.Plotly && chartEl.data) {
-      window.Plotly.purge(chartEl);
-    }
-    chartEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
-    chartEl.innerHTML = '<div class="p-6">Observed and fitted curves will appear here after calibration.</div>';
+    showMessage('Observed and fitted curves will appear here after calibration.');
+    return;
+  }
+
+  if (!window.Plotly || (typeof window.Plotly.newPlot !== 'function' && typeof window.Plotly.react !== 'function')) {
+    showMessage('Plotting library failed to load. Refresh the page and try again.');
     return;
   }
 
   chartEl.classList.remove('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
   chartEl.innerHTML = '';
+
   const sortedObs = [...obs].sort((a, b) => a[0] - b[0]);
   const sortedFit = [...fit].sort((a, b) => a[0] - b[0]);
   const obsTrace = {
@@ -624,7 +670,30 @@ function renderChart(result) {
     legend: { orientation: 'h', y: -0.25 },
   };
   const config = { displayModeBar: false, responsive: true };
-  Plotly.react(chartEl, [obsTrace, fitTrace], layout, config);
+
+  const plotter = chartEl.dataset.hasPlot === '1' && typeof window.Plotly.react === 'function'
+    ? window.Plotly.react
+    : window.Plotly.newPlot;
+
+  const handleError = (err) => {
+    console.error('Plotly render failed:', err);
+    showMessage('Unable to render plot. Check the console for details and retry.');
+  };
+
+  try {
+    const maybePromise = plotter(chartEl, [obsTrace, fitTrace], layout, config);
+    if (maybePromise && typeof maybePromise.then === 'function') {
+      maybePromise
+        .then(() => {
+          chartEl.dataset.hasPlot = '1';
+        })
+        .catch(handleError);
+    } else {
+      chartEl.dataset.hasPlot = '1';
+    }
+  } catch (err) {
+    handleError(err);
+  }
 }
 
 function formatNumber(value, digits = 3) {

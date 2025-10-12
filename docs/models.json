@@ -17,7 +17,7 @@
   "lagging": {
     "id": "lagging",
     "name": "Lagging Model (Lin & Yeh 2017)",
-    "formula": "\\[\\begin{aligned} s(t,r) &= \\mathcal{L}^{-1}\\{B(p)\\,K_0(k(p) r)\\},\\\\ k(p) &= \\sqrt{\\frac{p + j(1+p\\,\\tau_q)}{1+p\\,\\tau_s}} \\end{aligned}\\]",
+    "formula": "\\[\\begin{aligned} s(t,r) &= \\mathcal{L}^{-1}\\left\\{\\frac{Q_w}{2\\pi T}\\,\\frac{1}{p} K_0\\big(k(p)\\,r\\big)\\right\\},\\\\ k(p) &= \\sqrt{\\frac{S}{T}\\cdot\\frac{p(1+p\\,\\tau_q)}{1+p\\,\\tau_s}} \\end{aligned}\\]",
     "parameters": [
       { "key": "T", "latex": "$$T$$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
       { "key": "S", "latex": "$$S$$", "units": "$$-$$", "desc": "Storativity", "estimated": true },
@@ -28,7 +28,7 @@
     "assumptions": [
       "Phase-lagged response with skin and wellbore storage neglected",
       "Use for early-time delayed yield analysis",
-      "Inertial term j is fixed to zero in the UI; advanced users can enable it via the API"
+      "Lagging formulation assumes the inertial term is neglected (j = 0)"
     ]
   }
 }
