@@ -1,4 +1,5 @@
 const $ = (sel) => document.querySelector(sel);
+const SESSION_KEY = 'lagwellSession';
 
 const pyStatus = $('#pyStatus');
 const modelSelect = $('#model');
@@ -7,6 +8,173 @@ const statusEl = $('#status');
 const fitBtn = $('#fitBtn');
 const pdfBtn = $('#pdfBtn');
 const nBootSelect = $('#nBoot');
+const radiusInput = $('#r');
+const qInput = $('#Q');
+const confSelect = $('#conf');
+const rawInput = $('#raw');
+
+let cachedStorage = null;
+let storageChecked = false;
+
+function getSessionStorage() {
+  if (storageChecked) return cachedStorage;
+  storageChecked = true;
+  try {
+    cachedStorage = window.localStorage || null;
+  } catch (err) {
+    console.warn('localStorage is not available:', err);
+    cachedStorage = null;
+  }
+  return cachedStorage;
+}
+
+function ensureLoadingStyles() {
+  if (document.getElementById('fit-btn-loading-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'fit-btn-loading-styles';
+  style.textContent = `
+    #fitBtn.is-loading {
+      position: relative;
+      padding-left: 2.5rem;
+      cursor: progress;
+    }
+    #fitBtn.is-loading::before {
+      content: '';
+      position: absolute;
+      left: 0.85rem;
+      top: 50%;
+      width: 1rem;
+      height: 1rem;
+      margin-top: -0.5rem;
+      border-radius: 9999px;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #ffffff;
+      animation: fit-btn-spin 0.85s linear infinite;
+    }
+    #fitBtn.is-loading:disabled {
+      opacity: 0.8;
+    }
+    @keyframes fit-btn-spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function saveSession() {
+  const storage = getSessionStorage();
+  if (!storage) return;
+  const data = {
+    r: radiusInput?.value ?? '',
+    Q: qInput?.value ?? '',
+    model: modelSelect?.value ?? '',
+    conf: confSelect?.value ?? '',
+    nBoot: nBootSelect?.value ?? '',
+    raw: rawInput?.value ?? '',
+  };
+  try {
+    storage.setItem(SESSION_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.warn('Unable to persist session:', err);
+  }
+}
+
+function loadSession() {
+  const storage = getSessionStorage();
+  if (!storage) return;
+  try {
+    const payload = storage.getItem(SESSION_KEY);
+    if (!payload) return;
+    const data = JSON.parse(payload);
+    if (radiusInput && data.r != null) radiusInput.value = data.r;
+    if (qInput && data.Q != null) qInput.value = data.Q;
+    if (confSelect && data.conf != null && `${data.conf}`.length) confSelect.value = data.conf;
+    if (nBootSelect && data.nBoot != null && `${data.nBoot}`.length) nBootSelect.value = data.nBoot;
+    if (rawInput && typeof data.raw === 'string') rawInput.value = data.raw;
+    if (modelSelect && data.model != null && `${data.model}`.length) {
+      modelSelect.value = data.model;
+      renderModelDetails(data.model);
+    }
+  } catch (err) {
+    console.warn('Unable to restore previous session:', err);
+  }
+}
+
+function registerSessionListeners() {
+  const bindings = [
+    [radiusInput, 'input'],
+    [qInput, 'input'],
+    [confSelect, 'change'],
+    [nBootSelect, 'change'],
+    [rawInput, 'input'],
+  ];
+  bindings.forEach(([element, evt]) => {
+    if (!element) return;
+    element.addEventListener(evt, saveSession);
+  });
+}
+
+function showErrorToast(message) {
+  const containerId = 'lagwell-toast-root';
+  let container = document.getElementById(containerId);
+  if (!container) {
+    container = document.createElement('div');
+    container.id = containerId;
+    container.style.position = 'fixed';
+    container.style.top = '1.5rem';
+    container.style.left = '50%';
+    container.style.transform = 'translateX(-50%)';
+    container.style.zIndex = '9999';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.alignItems = 'center';
+    container.style.gap = '0.75rem';
+    container.style.pointerEvents = 'none';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.setAttribute('role', 'alert');
+  toast.textContent = message || 'An unexpected error occurred.';
+  toast.style.background = 'rgba(239, 68, 68, 0.9)';
+  toast.style.color = '#fff';
+  toast.style.padding = '0.75rem 1.25rem';
+  toast.style.borderRadius = '0.75rem';
+  toast.style.boxShadow = '0 12px 30px rgba(0, 0, 0, 0.35)';
+  toast.style.backdropFilter = 'saturate(120%) blur(6px)';
+  toast.style.pointerEvents = 'auto';
+  toast.style.fontSize = '0.95rem';
+  toast.style.fontWeight = '500';
+  toast.style.maxWidth = '26rem';
+  toast.style.textAlign = 'center';
+  toast.style.opacity = '0';
+  toast.style.transform = 'translateY(-12px)';
+  toast.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+
+  container.appendChild(toast);
+  requestAnimationFrame(() => {
+    toast.style.opacity = '1';
+    toast.style.transform = 'translateY(0)';
+  });
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-12px)';
+    setTimeout(() => {
+      toast.remove();
+      if (!container.childElementCount) {
+        container.remove();
+      }
+    }, 320);
+  }, 5000);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  ensureLoadingStyles();
+  loadSession();
+  registerSessionListeners();
+});
 
 let modelsCache = null;
 let currentModelMeta = null;
@@ -155,6 +323,7 @@ if (modelSelect) {
   renderModelDetails(modelSelect.value);
   modelSelect.addEventListener('change', (event) => {
     renderModelDetails(event.target.value);
+    saveSession();
   });
 }
 
@@ -244,9 +413,9 @@ const exampleBtn = $('#loadExample');
 if (exampleBtn) {
   exampleBtn.addEventListener('click', () => {
     const demo = `time_min,drawdown_m,r_m,Q_m3ph\n0.1,0.02,30,120\n0.2,0.05,30,120\n0.5,0.12,30,120\n1.0,0.18,30,120\n2.0,0.24,30,120\n3.5,0.30,30,120\n5.0,0.36,30,120`;
-    const raw = $('#raw');
-    if (raw) {
-      raw.value = demo;
+    if (rawInput) {
+      rawInput.value = demo;
+      saveSession();
       if (statusEl) statusEl.textContent = 'Example dataset loaded. Adjust values and press “Fit model”.';
     }
   });
@@ -258,14 +427,16 @@ if (fileInput) {
     const file = event.target.files?.[0];
     if (!file) return;
     const txt = await file.text();
-    const raw = $('#raw');
-    if (raw) raw.value = txt;
+    if (rawInput) rawInput.value = txt;
+    saveSession();
     if (statusEl) statusEl.textContent = `Loaded ${file.name}. Review and press “Fit model”.`;
   });
 }
 
 if (fitBtn) {
   fitBtn.addEventListener('click', async () => {
+    ensureLoadingStyles();
+    saveSession();
     if (statusEl) statusEl.textContent = 'Parsing data…';
     if (pdfBtn) pdfBtn.disabled = true;
 
@@ -273,23 +444,27 @@ if (fitBtn) {
     const originalLabel = fitBtn.textContent?.trim() || 'Fit model';
     fitBtn.disabled = true;
     fitBtn.dataset.originalLabel = originalLabel;
-    fitBtn.textContent = `Fitting… (Bootstrap N=${nBoot})`;
+    fitBtn.classList.add('is-loading');
+    fitBtn.setAttribute('aria-busy', 'true');
+    fitBtn.textContent = 'Parsing data…';
 
     try {
-      const rInput = parseFloat($('#r')?.value ?? 'NaN');
-      const qInput = parseFloat($('#Q')?.value ?? 'NaN');
+      const rValue = parseFloat(radiusInput?.value ?? 'NaN');
+      const qValue = parseFloat(qInput?.value ?? 'NaN');
       const model = modelSelect?.value ?? 'lagging';
-      const conf = parseFloat($('#conf')?.value ?? '0.95');
-      const rawText = $('#raw')?.value ?? '';
-      const parsed = parseCsvOrText(rawText, rInput, qInput);
+      const conf = parseFloat(confSelect?.value ?? '0.95');
+      const rawText = rawInput?.value ?? '';
+      const parsed = parseCsvOrText(rawText, rValue, qValue);
       const { times, draws, _r, _Q } = parsed;
       if (!times.length) {
         throw new Error('No valid observations found.');
       }
 
-      if (statusEl) statusEl.textContent = 'Initialising Python runtime…';
+      if (statusEl) statusEl.textContent = 'Initializing Python runtime…';
+      fitBtn.textContent = 'Initializing Python...';
       const py = await ensurePyodide();
       if (statusEl) statusEl.textContent = `Running bootstrap fits (N=${nBoot})…`;
+      fitBtn.textContent = `Running bootstrap (N=${nBoot})...`;
 
       const timesProxy = py.toPy(Array.from(times));
       const drawsProxy = py.toPy(Array.from(draws));
@@ -335,11 +510,13 @@ if (fitBtn) {
         };
 
         window._lastFit = resultObj;
+        fitBtn.textContent = 'Processing results...';
         renderParams(resultObj);
         renderMetrics(resultObj);
         renderChart(resultObj);
         if (pdfBtn) pdfBtn.disabled = false;
         if (statusEl) statusEl.textContent = `Fit complete. Bootstrap N=${nBoot}.`;
+        fitBtn.textContent = 'Fit complete';
       } finally {
         if (py && py.ffi && typeof py.ffi.destroy_proxies === 'function') {
           py.ffi.destroy_proxies(pyproxies);
@@ -355,9 +532,12 @@ if (fitBtn) {
       }
     } catch (err) {
       console.error(err);
-      if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+      showErrorToast(err.message);
+      if (statusEl) statusEl.textContent = 'Error encountered. See notification for details.';
     } finally {
       fitBtn.disabled = false;
+      fitBtn.classList.remove('is-loading');
+      fitBtn.removeAttribute('aria-busy');
       const original = fitBtn.dataset.originalLabel || 'Fit model';
       fitBtn.textContent = original;
     }

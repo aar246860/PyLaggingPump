@@ -35,35 +35,19 @@
     };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
-  <style>
-    #docLink{
-      position:fixed; top:12px; right:12px; z-index:2147483647;
-      padding:8px 14px; border-radius:9999px; border:1px solid rgba(255,255,255,.14);
-      background:rgba(22,24,28,.72); color:#fff; text-decoration:none;
-      backdrop-filter:saturate(140%) blur(6px);
-      font:600 13px/1 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial;
-      box-shadow:0 4px 18px rgba(0,0,0,.25);
-    }
-    #docLink:hover{ background:rgba(59,130,246,.85); border-color:rgba(255,255,255,.25) }
-    #docLink:focus{ outline:2px solid rgba(59,130,246,.9); outline-offset:2px }
-    @media (max-width:480px){ #docLink{ padding:8px 12px; font-weight:700 } }
-    /* Footer backup link container */
-    .app-docs-footer{ margin:28px auto 16px; text-align:center; color:#cbd5e1 }
-    .app-docs-footer a{ color:#93c5fd; text-decoration:underline }
-    .app-docs-footer a:hover{ color:#bfdbfe }
-  </style>
 </head>
 <body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
-  <a id="docLink" href="./overview.html" aria-label="Open documentation">Overview</a>
+  <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60 border-b border-white/10">
+    <nav class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
+      <div class="flex items-center gap-4 text-sm">
+        <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
+        <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
+      </div>
+    </nav>
+  </header>
   <div class="max-w-6xl mx-auto px-4 py-10 space-y-12">
     <header class="space-y-6">
-      <nav class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between border-b border-zinc-800">
-        <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
-        <div class="flex items-center gap-4 text-sm">
-          <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
-          <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
-        </div>
-      </nav>
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
         <div class="space-y-3 md:max-w-2xl">
           <p class="text-sm uppercase tracking-[0.35em] text-indigo-400/80">Lagwell</p>
@@ -137,7 +121,7 @@
                 <input id="csvFile" type="file" accept=".csv" class="block w-full text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-indigo-500/30" />
               </label>
               <div class="flex items-end">
-                <button id="loadExample" type="button" class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
+                <button id="loadExample" type="button" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
                   Load example dataset
                 </button>
               </div>
@@ -197,16 +181,13 @@
       </div>
     </main>
 
-    <footer class="text-sm text-zinc-500 text-center space-y-2 py-8">
+    <footer class="text-sm text-zinc-500 text-center space-y-2 py-8 mt-12 border-t border-zinc-800">
       <p><strong>Disclaimer:</strong> This tool is for research/educational use only. Not certified for field use.</p>
       <div class="flex justify-center gap-6">
         <a href="https://github.com/aar246860/PyLaggingPump" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">GitHub Source</a>
         <a href="https://github.com/aar246860/PyLaggingPump/issues" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">Report an Issue</a>
       </div>
     </footer>
-  </div>
-  <div class="app-docs-footer">
-    Need the theory and usage guide? <a href="./overview.html">Read the Overview</a>
   </div>
   <script src="./app.js"></script>
 </body>
