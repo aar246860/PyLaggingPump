@@ -95,8 +95,8 @@ $('#fitBtn').addEventListener('click', async () => {
     const py = await ensurePyodide();
     $('#status').textContent = '擬合中（瀏覽器端 Python）...';
 
-    const pyTimes = py.toPy(Array.from(times));
-    const pyDraws = py.toPy(Array.from(draws));
+    const times_js = py.toPy(Array.from(times));
+    const draws_js = py.toPy(Array.from(draws));
 
     let fitPy = null;
     let resultPy = null;
@@ -106,7 +106,16 @@ $('#fitBtn').addEventListener('click', async () => {
       if (!fitPy || typeof fitPy.callKwargs !== 'function') {
         throw new Error('fit_model 尚未載入');
       }
-      resultPy = fitPy.callKwargs({ args: [pyTimes, pyDraws, model, _r, _Q] });
+      const priors = null;
+      resultPy = fitPy.callKwargs({
+        times: times_js,
+        draws: draws_js,
+        model_name: model,
+        r: _r,
+        Q: _Q,
+        priors,
+        conf,
+      });
       const fitResult = resultPy.toJs({ pyproxies, dict_converter: Object.fromEntries });
       try {
         const [params = {}, metrics = {}, fitted = []] = Array.isArray(fitResult) ? fitResult : [];
@@ -142,8 +151,8 @@ $('#fitBtn').addEventListener('click', async () => {
         if (fitPy && typeof fitPy.destroy === 'function') fitPy.destroy();
       }
     } finally {
-      if (pyTimes && typeof pyTimes.destroy === 'function') pyTimes.destroy();
-      if (pyDraws && typeof pyDraws.destroy === 'function') pyDraws.destroy();
+      if (times_js && typeof times_js.destroy === 'function') times_js.destroy();
+      if (draws_js && typeof draws_js.destroy === 'function') draws_js.destroy();
     }
 
   } catch (err) {
