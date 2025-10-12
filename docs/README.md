@@ -1,7 +1,7 @@
 
 # Lagwell Webapp (static)
 
-Minimal static UI to call the FastAPI backend.
+Pure front-end pumping test UI. By default the page runs **Pyodide** inside the browser to fit data without needing the FastAPI backend.
 
 ## Run
 
@@ -10,13 +10,14 @@ Backend:
 uvicorn apps.api.main:app --reload
 ```
 
-Frontend:
+Frontend only:
 ```bash
-python -m http.server 5173 --directory docs
-# open http://localhost:5173/
+# simply double-click docs/index.html or
+python -m http.server --directory docs
+# open http://localhost:8000/
 ```
 
-Set a custom API base (if backend is remote):
+Optional remote backend:
 ```js
 localStorage.setItem('lagwell_api','https://your-api.example.com')
 ```
