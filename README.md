@@ -31,13 +31,12 @@ python -m http.server 5173 --directory docs
 
 ## 如何開啟網站
 
-在 GitHub Pages 設定頁面選擇 **Deploy from a branch**，並設定：
+到 Repository 的 **Settings → Pages**，將 **Source** 改為 **Deploy from a branch**，並設定：
 
-- **Source**：Deploy from a branch
-- **Branch**：main（或你使用的分支）
-- **Folder**：/docs
+- **Branch**：`main`（或你使用的分支）
+- **Folder**：`/docs`
 
-儲存後，GitHub Pages 會從 `docs/` 目錄發佈靜態網站。
+儲存後，GitHub Pages 會從 `docs/` 目錄發佈靜態網站；入口檔必須位於 `docs/` 根層，可使用 `index.html`、`index.md` 或 `README.md` 任一檔案作為首頁。
 
 ## 在 GitHub Pages（HTTPS）測試
 
