@@ -365,16 +365,18 @@ function getModelParamKeySet(modelMeta) {
   return new Set(keys);
 }
 
-function filterParamsForModel(rawParams, rawCi, modelMeta) {
+function filterParamsForModel(rawParams, rawCi, modelMeta, rawSamples) {
   const params = rawParams && typeof rawParams === 'object' ? rawParams : {};
   const ci = rawCi && typeof rawCi === 'object' ? rawCi : {};
+  const samples = rawSamples && typeof rawSamples === 'object' ? rawSamples : {};
   const allowed = getModelParamKeySet(modelMeta);
   if (!allowed.size) {
-    return { params, ci };
+    return { params, ci, samples };
   }
 
   const filteredParams = {};
   const filteredCi = {};
+  const filteredSamples = {};
   Object.keys(params).forEach((key) => {
     if (!allowed.has(key)) return;
     filteredParams[key] = params[key];
@@ -382,7 +384,16 @@ function filterParamsForModel(rawParams, rawCi, modelMeta) {
       filteredCi[key] = ci[key];
     }
   });
-  return { params: filteredParams, ci: filteredCi };
+  Object.keys(samples).forEach((key) => {
+    if (!allowed.has(key)) return;
+    const values = samples[key];
+    filteredSamples[key] = Array.isArray(values) ? [...values] : values;
+  });
+
+  console.debug('[Lagwell] filterParamsForModel allowed keys:', Array.from(allowed));
+  console.debug('[Lagwell] filterParamsForModel filtered params:', filteredParams);
+
+  return { params: filteredParams, ci: filteredCi, samples: filteredSamples };
 }
 
 async function ensurePyodide() {
@@ -520,8 +531,13 @@ if (fitBtn) {
           n_boot: nBoot,
         });
         const fitResult = resultPy.toJs({ pyproxies, dict_converter: Object.fromEntries });
-        const [params = {}, metrics = {}, fitted = [], ci = {}] = Array.isArray(fitResult) ? fitResult : [];
-        const { params: filteredParams, ci: filteredCi } = filterParamsForModel(params, ci, currentModelMeta);
+        const [params = {}, metrics = {}, fitted = [], ci = {}, samples = {}] = Array.isArray(fitResult) ? fitResult : [];
+        const { params: filteredParams, ci: filteredCi, samples: filteredSamples } = filterParamsForModel(
+          params,
+          ci,
+          currentModelMeta,
+          samples,
+        );
         const metricsObj = metrics && typeof metrics === 'object' ? metrics : {};
         const createdAt = new Date();
         const modelLabel = currentModelMeta?.name || model.toUpperCase();
@@ -534,6 +550,7 @@ if (fitBtn) {
             observed: times.map((t, idx) => [t, draws[idx]]),
             fitted: Array.isArray(fitted) ? fitted : [],
           },
+          samples: filteredSamples,
           model,
           r: _r,
           Q: _Q,
@@ -553,7 +570,7 @@ if (fitBtn) {
         renderMetrics(resultObj);
         fitHistory.push(resultObj);
         renderFitHistory();
-        renderChart(getSelectedFits());
+        await renderChart(getSelectedFits());
         if (pdfBtn) pdfBtn.disabled = false;
         if (statusEl) statusEl.textContent = `Fit complete. Bootstrap N=${nBoot}.`;
         fitBtn.textContent = 'Fit complete';
@@ -586,10 +603,12 @@ if (fitBtn) {
 
 if (pdfBtn) {
   pdfBtn.addEventListener('click', () => {
-    if (!window._lastFit) return;
     if (!reportModal) return;
     reportModal.classList.remove('hidden');
     reportModal.classList.add('flex');
+    if (!window._lastFit && statusEl) {
+      statusEl.textContent = 'Configure report details after running a fit to enable export.';
+    }
   });
 }
 
@@ -876,10 +895,16 @@ function renderParams(result) {
     const description = descriptionText
       ? `<div class="text-xs text-zinc-500 mt-1">${descriptionText}</div>`
       : '';
-    const unitsText = meta?.units ? latexToPlain(meta.units) : '';
-    const units = unitsText ? ` <span class="text-xs font-normal text-zinc-500">(${unitsText})</span>` : '';
-    const labelLatex = meta?.latex || meta?.symbol;
-    const label = labelLatex ? latexToPlain(labelLatex) : key;
+    const unitsLatex = typeof meta?.units === 'string' ? meta.units : '';
+    const unitsPlain = unitsLatex ? latexToPlain(unitsLatex) : '';
+    const units = unitsLatex
+      ? ` <span class="text-xs font-normal text-zinc-500 math" aria-label="${unitsPlain}">(${unitsLatex})</span>`
+      : '';
+    const labelLatex = typeof meta?.latex === 'string' ? meta.latex : meta?.symbol;
+    const labelPlain = labelLatex ? latexToPlain(labelLatex) : latexToPlain(key);
+    const label = labelLatex
+      ? `<span class="math" aria-label="${labelPlain}">${labelLatex}</span>`
+      : `<span>${labelPlain}</span>`;
     const ciPair = Array.isArray(ci[key]) && ci[key].length === 2
       ? `[${fmtExp(ci[key][0])}, ${fmtExp(ci[key][1])}]`
       : '—';
@@ -914,6 +939,8 @@ function renderParams(result) {
       </tbody>
     </table>
   `;
+
+  typesetNow(container);
 }
 
 function renderMetrics(result) {
@@ -1027,7 +1054,9 @@ function renderFitHistory() {
     checkbox.addEventListener('change', () => {
       fit.selected = checkbox.checked;
       item.classList.toggle('is-selected', !!fit.selected);
-      renderChart(getSelectedFits());
+      renderChart(getSelectedFits()).catch((err) => {
+        console.error('Failed to refresh chart selection:', err);
+      });
     });
 
     item.appendChild(info);
@@ -1039,7 +1068,7 @@ function renderFitHistory() {
   fitHistoryContainer.appendChild(list);
 }
 
-function renderChart(fitsToRender = []) {
+async function renderChart(fitsToRender = []) {
   const chartEl = $('#chart');
   if (!chartEl) return;
 
@@ -1076,13 +1105,14 @@ function renderChart(fitsToRender = []) {
   chartEl.innerHTML = '';
 
   const palette = ['#22d3ee', '#a855f7', '#f97316', '#38bdf8', '#f43f5e', '#14b8a6'];
-  const traces = [];
+  const bootstrapTraces = [];
+  const primaryTraces = [];
 
   const baseFit = fits[0];
   const observed = Array.isArray(baseFit?.curves?.observed) ? [...baseFit.curves.observed] : [];
   if (observed.length) {
     const sortedObs = observed.sort((a, b) => a[0] - b[0]);
-    traces.push({
+    primaryTraces.push({
       x: sortedObs.map((d) => d[0]),
       y: sortedObs.map((d) => d[1]),
       name: 'Observed',
@@ -1090,6 +1120,102 @@ function renderChart(fitsToRender = []) {
       type: 'scatter',
       marker: { color: '#94a3b8', size: 8, opacity: 0.85 },
     });
+  }
+
+  const baseFitted = Array.isArray(baseFit?.curves?.fitted)
+    ? [...baseFit.curves.fitted].sort((a, b) => a[0] - b[0])
+    : [];
+
+  const sampleEntries = baseFit?.samples && typeof baseFit.samples === 'object'
+    ? Object.entries(baseFit.samples)
+    : [];
+
+  if (baseFitted.length && sampleEntries.length) {
+    try {
+      const validSamples = sampleEntries.filter(([, values]) => Array.isArray(values) && values.length);
+      if (validSamples.length) {
+        const sampleLengths = validSamples.map(([, values]) => values.length);
+        const totalSamples = sampleLengths.length ? Math.max(...sampleLengths) : 0;
+        const limit = Math.min(totalSamples, 50);
+        if (limit > 0) {
+          const times = baseFitted.map((d) => d[0]);
+          const py = await ensurePyodide();
+          const drawdownName = baseFit.model === 'theis' ? 'theis_drawdown' : 'lagging_drawdown_time';
+          const drawdownFunc = py.globals.get(drawdownName);
+          if (!drawdownFunc) {
+            console.warn(`Missing drawdown function: ${drawdownName}`);
+          } else {
+            const proxies = [];
+            try {
+              const timeProxy = py.toPy(times);
+              proxies.push(timeProxy);
+              for (let idx = 0; idx < limit; idx += 1) {
+                const paramSet = {};
+                let skip = false;
+                validSamples.forEach(([key, values]) => {
+                if (skip) return;
+                if (idx >= values.length) {
+                  skip = true;
+                  return;
+                }
+                const value = values[idx];
+                if (value == null || Number.isNaN(value)) {
+                  skip = true;
+                  return;
+                }
+                paramSet[key] = Number(value);
+              });
+              if (skip) continue;
+
+              let curveProxy = null;
+              if (baseFit.model === 'theis') {
+                const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
+                const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
+                if (!Number.isFinite(Tval) || !Number.isFinite(Sval)) continue;
+                curveProxy = drawdownFunc(timeProxy, Tval, Sval, Number(baseFit.r), Number(baseFit.Q));
+              } else {
+                const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
+                const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
+                const tauQ = Number.isFinite(paramSet.tau_q) ? paramSet.tau_q : Number(baseFit.params?.tau_q);
+                const tauS = Number.isFinite(paramSet.tau_s) ? paramSet.tau_s : Number(baseFit.params?.tau_s);
+                const jVal = Number.isFinite(paramSet.j) ? paramSet.j : Number(baseFit.params?.j ?? 0);
+                if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
+                curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
+              }
+              if (!curveProxy) continue;
+              proxies.push(curveProxy);
+              const jsValues = curveProxy.toJs();
+              const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
+              if (!yValues.length) continue;
+                bootstrapTraces.push({
+                  x: times,
+                  y: yValues,
+                  mode: 'lines',
+                  type: 'scatter',
+                  line: { color: 'rgba(113, 113, 122, 0.2)', width: 1 },
+                  hoverinfo: 'skip',
+                  name: 'Bootstrap samples',
+                  showlegend: idx === 0,
+                });
+              }
+            } catch (err) {
+              console.warn('Bootstrap curve rendering failed:', err);
+            } finally {
+              proxies.forEach((proxy) => {
+                if (proxy && typeof proxy.destroy === 'function') {
+                  proxy.destroy();
+                }
+              });
+              if (drawdownFunc && typeof drawdownFunc.destroy === 'function') {
+                drawdownFunc.destroy();
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Unable to compute bootstrap samples:', err);
+    }
   }
 
   fits.forEach((fit, idx) => {
@@ -1101,7 +1227,7 @@ function renderChart(fitsToRender = []) {
     if (r2 != null) {
       legendLabelParts.push(`R² ${r2}`);
     }
-    traces.push({
+    primaryTraces.push({
       x: sortedFit.map((d) => d[0]),
       y: sortedFit.map((d) => d[1]),
       name: legendLabelParts.filter(Boolean).join(' • '),
@@ -1145,17 +1271,14 @@ function renderChart(fitsToRender = []) {
     showMessage('Unable to render plot. Check the console for details and retry.');
   };
 
+  const traces = [...bootstrapTraces, ...primaryTraces];
+
   try {
     const maybePromise = plotter(chartEl, traces, layout, config);
     if (maybePromise && typeof maybePromise.then === 'function') {
-      maybePromise
-        .then(() => {
-          chartEl.dataset.hasPlot = '1';
-        })
-        .catch(handleError);
-    } else {
-      chartEl.dataset.hasPlot = '1';
+      await maybePromise;
     }
+    chartEl.dataset.hasPlot = '1';
   } catch (err) {
     handleError(err);
   }
@@ -1292,11 +1415,15 @@ if (proFeatureDatalogger) {
 renderFitHistory();
 
 if (clearHistoryBtn) {
-  clearHistoryBtn.addEventListener('click', () => {
+  clearHistoryBtn.addEventListener('click', async () => {
     fitHistory = [];
     window._lastFit = null;
     renderFitHistory();
-    renderChart([]);
+    try {
+      await renderChart([]);
+    } catch (err) {
+      console.error('Failed to clear chart:', err);
+    }
     if (pdfBtn) pdfBtn.disabled = true;
     if (statusEl) statusEl.textContent = 'History cleared. Ready for new fit.';
   });

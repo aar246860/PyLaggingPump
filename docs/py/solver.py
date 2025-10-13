@@ -527,6 +527,7 @@ def bootstrap_fit(
             samples.setdefault(key, []).append(float(value))
 
     ci: Dict[str, Sequence[float]] = {}
+    filtered_samples: Dict[str, list[float]] = {}
     for key, values in samples.items():
         if not values:
             continue
@@ -535,8 +536,9 @@ def bootstrap_fit(
             float(np.percentile(arr, lower_pct)),
             float(np.percentile(arr, upper_pct)),
         ]
+        filtered_samples[key] = list(arr.tolist())
 
-    return {'ci': ci, 'samples': samples}
+    return {'ci': ci, 'samples': filtered_samples}
 
 
 def fit_with_ci(
@@ -569,7 +571,7 @@ def fit_with_ci(
     if not fit_j:
         params_out.pop('j', None)
 
-    ci = bootstrap_fit(
+    bootstrap_result = bootstrap_fit(
         times,
         draws,
         model_name,
@@ -580,9 +582,13 @@ def fit_with_ci(
         n_boot=n_boot,
         base_fit=(params_out, fitted),
         **kwargs,
-    )['ci']
+    )
+
+    ci = bootstrap_result.get('ci', {})
+    samples = bootstrap_result.get('samples', {})
 
     if not fit_j:
         ci = {key: value for key, value in ci.items() if key in params_out}
+        samples = {key: value for key, value in samples.items() if key in params_out}
 
-    return params_out, metrics, fitted, ci
+    return params_out, metrics, fitted, ci, samples
