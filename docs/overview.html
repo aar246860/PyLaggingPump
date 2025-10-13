@@ -32,6 +32,7 @@
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
   <link rel="stylesheet" href="./overview.css">
   <script defer src="./overview.js"></script>
+  <!-- analytics placeholder -->
 </head>
 <body class="bg-zinc-950 text-zinc-100 font-[Inter] antialiased selection:bg-indigo-500/50">
 
@@ -40,6 +41,7 @@
       <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
       <div class="flex items-center gap-4 text-sm">
         <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
+        <a href="./resources.html" class="text-zinc-300 hover:text-white transition">Resources</a>
         <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
       </div>
     </nav>
@@ -239,8 +241,11 @@
             <p class="text-zinc-300">
               Using data from a classic Theis well function problem in Fetter's "Applied Hydrogeology," we found that Lagwell Explorer's fitted curve closely matches the textbook solution. The calculated transmissivity (T) and storativity (S) values were within 1% of the expected results.
             </p>
-            <div class="rounded-md border border-zinc-700 mt-2 bg-zinc-900 flex items-center justify-center h-48">
-                <p class="text-zinc-500">Comparison Chart Placeholder</p>
+            <div class="rounded-md border border-zinc-700 mt-2 bg-zinc-900 p-4">
+                <img src="https://raw.githubusercontent.com/aar246860/PyLaggingPump/main/docs/img/validation-chart-placeholder.png" alt="Validation chart comparing Lagwell results with textbook Theis solution" class="rounded-md w-full">
+                <p class="text-center text-xs text-zinc-400 mt-2">
+                  Figure 2: Lagwell's Theis model fit (line) plotted against Fetter's "Applied Hydrogeology" textbook data (dots).
+                </p>
             </div>
             <p class="text-xs text-zinc-400">
               For a detailed walkthrough of the validation process, see our <a href="#" class="underline">technical blog post</a>.
@@ -294,6 +299,7 @@
       <div class="flex justify-center gap-6 text-zinc-500">
         <a href="https://github.com/aar246860/PyLaggingPump" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">GitHub Source</a>
         <a href="https://github.com/aar246860/PyLaggingPump/issues" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">Report an Issue</a>
+        <a href="mailto:hello@example.com" class="hover:text-zinc-300 transition">Feedback &amp; Support</a>
       </div>
     </div>
   </footer>

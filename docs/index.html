@@ -10,6 +10,8 @@
   <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://unpkg.com/jspdf-autotable"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@9.1.1/dist/css/shepherd.css" />
+  <script src="https://cdn.jsdelivr.net/npm/shepherd.js@9.1.1/dist/js/shepherd.min.js"></script>
   <script>
     window.MathJax = {
       tex: {
@@ -36,6 +38,7 @@
     };
   </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  <!-- analytics placeholder -->
 </head>
 <body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased">
   <header class="sticky top-0 z-50 backdrop-blur supports-[backdrop-filter]:bg-zinc-950/60 border-b border-white/10">
@@ -43,6 +46,7 @@
       <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
       <div class="flex items-center gap-4 text-sm">
         <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
+        <a href="./resources.html" class="text-zinc-300 hover:text-white transition">Resources</a>
         <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
       </div>
     </nav>
@@ -50,13 +54,26 @@
   <div class="max-w-6xl mx-auto px-4 py-10 space-y-12">
     <header class="space-y-6">
       <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-        <div class="space-y-3 md:max-w-2xl">
+        <div id="heroValue" class="space-y-4 md:max-w-3xl">
           <p class="text-sm uppercase tracking-[0.35em] text-indigo-400/80">Lagwell</p>
-          <h1 class="text-3xl md:text-4xl font-semibold leading-tight">Pump Test Explorer</h1>
+          <h1 class="text-3xl md:text-4xl font-bold leading-tight tracking-tight">Secure, Offline-Capable Pumping Test Analysis in Your Browser</h1>
           <p class="text-lg text-zinc-300 leading-relaxed">
-            Fit analytical aquifer models entirely in the browser with Pyodide-powered SciPy.
-            Upload drawdown observations, compare Theis and lagging formulations, and export polished PDFs.
+            Your data never leaves your computer. Get instant, serverless pumping test analysis with the power of Python and SciPy. 100% private, secure, and ready anywhere.
           </p>
+          <div class="pt-4 flex flex-col sm:flex-row gap-6 text-base">
+            <div class="flex items-center gap-3">
+              <svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.286Z" /></svg>
+              <span class="font-semibold">Data Security Guaranteed</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
+              <span class="font-semibold">Instant Results, No Uploads</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.075c0 1.313-.964 2.508-2.316 2.752-1.351.244-2.687.116-4.002-.366a11.928 11.928 0 0 1-8.524-8.524c-.482-1.315-.61-2.651-.366-4.002 1.218-1.351 2.752-2.316 2.752-2.316m4.075 4.075 2.062-2.062m0 0-2.062-2.062M16.188 6.188l-2.062 2.062" /></svg>
+              <span class="font-semibold">Works Anywhere, Even Offline</span>
+            </div>
+          </div>
         </div>
         <div id="pyStatus" class="px-4 py-2 rounded-full text-sm font-medium bg-zinc-900/80 border border-zinc-800/80 text-zinc-300">
           Python runtime not loaded
@@ -108,8 +125,8 @@
                   </button>
                 </div>
                 <div class="sm:col-span-2">
-                  <button type="button" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-500 bg-zinc-800/30 cursor-not-allowed" title="Coming Soon">
-                    Import from Datalogger ✨ (Pro)
+                  <button id="proFeatureDatalogger" type="button" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 transition">
+                    Import from Datalogger <span class="ml-2 px-2 py-0.5 text-xs font-semibold bg-indigo-500 text-white rounded-full">PRO</span>
                   </button>
                 </div>
               </div>
@@ -128,7 +145,7 @@
                 <select id="model" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
                   <option value="lagging" selected>Lagging</option>
                   <option value="theis">Theis</option>
-                  <option value="fractured" disabled>Fractured Aquifer Model ✨ (Pro)</option>
+                    <option value="fractured">Fractured Aquifer Model ✨ (Pro)</option>
                 </select>
               </label>
               <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
@@ -214,11 +231,23 @@
       </div>
     </main>
 
+    <section class="border border-zinc-800/60 rounded-2xl bg-zinc-900/40 p-8 space-y-6">
+      <h2 class="text-2xl font-semibold text-center">Trusted by hydrogeologists worldwide</h2>
+      <p class="text-zinc-400 text-center max-w-2xl mx-auto">Consultancies, universities, and water utilities rely on Lagwell to accelerate aquifer testing workflows without sacrificing data control.</p>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 opacity-70">
+        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">University Logo</div>
+        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">Consulting Firm</div>
+        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">Municipal Utility</div>
+        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">Research Lab</div>
+      </div>
+    </section>
+
     <footer class="text-sm text-zinc-500 text-center space-y-2 py-8 mt-12 border-t border-zinc-800">
       <p><strong>Disclaimer:</strong> This tool is for research/educational use only. Not certified for field use.</p>
       <div class="flex justify-center gap-6">
         <a href="https://github.com/aar246860/PyLaggingPump" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">GitHub Source</a>
         <a href="https://github.com/aar246860/PyLaggingPump/issues" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">Report an Issue</a>
+        <a href="mailto:hello@example.com" class="hover:text-zinc-300 transition">Feedback &amp; Support</a>
       </div>
     </footer>
   </div>
@@ -239,6 +268,16 @@
         <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
           <span>Site Location</span>
           <input id="reportLocation" type="text" placeholder="e.g., Site A, Well MW-1" class="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
+        </label>
+      </div>
+      <div class="border-t border-zinc-700 my-4"></div>
+      <div class="space-y-3 opacity-60">
+        <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+          <span>Your Company Logo (.png, .jpg)</span>
+          <div class="flex items-center justify-between p-2 rounded-lg border border-dashed border-zinc-600">
+            <span class="text-zinc-400">Disabled in Community Edition</span>
+            <a href="./pricing.html" class="px-3 py-1 text-xs font-semibold bg-indigo-500 text-white rounded-full hover:bg-indigo-600">UPGRADE</a>
+          </div>
         </label>
       </div>
       <div class="flex gap-4 pt-4">

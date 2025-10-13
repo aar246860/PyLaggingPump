@@ -1,5 +1,6 @@
 const $ = (sel) => document.querySelector(sel);
 const SESSION_KEY = 'lagwellSession';
+const TOUR_STORAGE_KEY = 'lagwellOnboardingTour_v1';
 
 const pyStatus = $('#pyStatus');
 const modelSelect = $('#model');
@@ -20,6 +21,8 @@ const reportClientInput = $('#reportClient');
 const reportLocationInput = $('#reportLocation');
 const fitHistoryContainer = $('#fitHistory');
 const clearHistoryBtn = $('#clearHistoryBtn');
+
+let lastModelSelection = modelSelect?.value ?? 'lagging';
 
 let cachedStorage = null;
 let storageChecked = false;
@@ -102,8 +105,14 @@ function loadSession() {
     if (nBootSelect && data.nBoot != null && `${data.nBoot}`.length) nBootSelect.value = data.nBoot;
     if (rawInput && typeof data.raw === 'string') rawInput.value = data.raw;
     if (modelSelect && data.model != null && `${data.model}`.length) {
-      modelSelect.value = data.model;
-      renderModelDetails(data.model);
+      const restoredModel = data.model;
+      if (restoredModel === 'fractured') {
+        modelSelect.value = 'lagging';
+        renderModelDetails('lagging');
+      } else {
+        modelSelect.value = restoredModel;
+        renderModelDetails(restoredModel);
+      }
     }
   } catch (err) {
     console.warn('Unable to restore previous session:', err);
@@ -184,6 +193,8 @@ document.addEventListener('DOMContentLoaded', () => {
   ensureLoadingStyles();
   loadSession();
   registerSessionListeners();
+  lastModelSelection = modelSelect?.value ?? lastModelSelection;
+  initOnboardingTour();
 });
 
 let modelsCache = null;
@@ -332,7 +343,16 @@ async function renderModelDetails(modelId) {
 if (modelSelect) {
   renderModelDetails(modelSelect.value);
   modelSelect.addEventListener('change', (event) => {
-    renderModelDetails(event.target.value);
+    const selected = event.target.value;
+    if (selected === 'fractured') {
+      showUpgradeModal('Fractured Aquifer Model');
+      event.target.value = lastModelSelection;
+      renderModelDetails(event.target.value);
+      saveSession();
+      return;
+    }
+    lastModelSelection = selected;
+    renderModelDetails(selected);
     saveSession();
   });
 }
@@ -763,6 +783,22 @@ if (generateReportBtn) {
       }
     }
 
+    // --- START: Watermark Addition ---
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(150);
+      doc.text('Generated with Lagwell Explorer - Community Edition', 105, 290, { align: 'center' });
+    }
+    doc.addPage();
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    doc.text('Upgrade to Lagwell Professional to remove this watermark and add your own company logo.', 14, 20);
+    doc.text('Visit our website to learn more.', 14, 26);
+    // --- END: Watermark Addition ---
+
     doc.save(`Lagwell_Report_${model}_${new Date().toISOString().slice(0, 10)}.pdf`);
     // --- END: Professional PDF Generation Logic ---
     closeReportModal();
@@ -1123,6 +1159,134 @@ function renderChart(fitsToRender = []) {
   } catch (err) {
     handleError(err);
   }
+}
+
+function initOnboardingTour() {
+  if (typeof Shepherd === 'undefined') return;
+  const storage = getSessionStorage();
+  if (storage?.getItem(TOUR_STORAGE_KEY)) return;
+
+  const tour = new Shepherd.Tour({
+    useModalOverlay: true,
+    defaultStepOptions: {
+      classes: 'bg-zinc-900 text-zinc-100 border border-zinc-700 shadow-2xl rounded-2xl max-w-sm',
+      cancelIcon: { enabled: true },
+      scrollTo: { behavior: 'smooth', block: 'center' },
+    },
+  });
+
+  const steps = [
+    {
+      id: 'welcome',
+      title: 'Welcome to Lagwell',
+      text: 'Analyze pumping tests privately in your browser with no uploads required.',
+      attachTo: { element: '#heroValue', on: 'bottom' },
+    },
+    {
+      id: 'data',
+      title: 'Load sample data',
+      text: 'Try the explorer instantly by loading the example dataset or importing your CSV.',
+      attachTo: { element: '#loadExample', on: 'bottom' },
+    },
+    {
+      id: 'model',
+      title: 'Choose your model',
+      text: 'Compare Theis and Lagging responses. Professional plans unlock fractured models.',
+      attachTo: { element: '#model', on: 'bottom' },
+    },
+    {
+      id: 'report',
+      title: 'Export branded reports',
+      text: 'Fit the model, review metrics, and generate a polished PDF with one click.',
+      attachTo: { element: '#pdfBtn', on: 'top' },
+    },
+  ];
+
+  steps.forEach((step, index) => {
+    const hasTarget = step.attachTo?.element && document.querySelector(step.attachTo.element);
+    tour.addStep({
+      id: step.id,
+      title: step.title,
+      text: step.text,
+      attachTo: hasTarget ? step.attachTo : undefined,
+      buttons: [
+        {
+          text: 'Skip',
+          classes: 'shepherd-button-secondary',
+          action: () => tour.cancel(),
+        },
+        {
+          text: index === steps.length - 1 ? 'Finish' : 'Next',
+          classes: 'shepherd-button-primary bg-indigo-500 hover:bg-indigo-600 text-white',
+          action: () => (index === steps.length - 1 ? tour.complete() : tour.next()),
+        },
+      ],
+    });
+  });
+
+  if (!tour.steps?.length) return;
+
+  const markComplete = () => {
+    try {
+      getSessionStorage()?.setItem(TOUR_STORAGE_KEY, '1');
+    } catch (err) {
+      console.warn('Unable to persist onboarding completion', err);
+    }
+  };
+
+  tour.on('complete', markComplete);
+  tour.on('cancel', markComplete);
+
+  setTimeout(() => {
+    tour.start();
+  }, 600);
+}
+
+function showUpgradeModal(featureName) {
+  const modalId = 'upgradeModal';
+  let modal = document.getElementById(modalId);
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center';
+    modal.innerHTML = `
+      <div class="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-xl w-full max-w-md p-6 m-4 space-y-4 text-center">
+        <h2 class="text-2xl font-semibold">Unlock Advanced Analysis with Professional</h2>
+        <p class="text-zinc-300">The <strong>"Feature"</strong> feature is part of our Professional plan. Upgrade to save time and unlock powerful tools like derivative analysis and custom-branded reports.</p>
+        <div class="flex gap-4 pt-4">
+          <button id="closeUpgradeModalBtn" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 transition">Maybe Later</button>
+          <a href="./pricing.html" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-500 text-sm font-semibold text-white hover:bg-indigo-600 transition">View Pricing</a>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    const closeBtn = modal.querySelector('#closeUpgradeModalBtn');
+    const hideModal = () => {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+    if (closeBtn) {
+      closeBtn.addEventListener('click', hideModal);
+    }
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) hideModal();
+    });
+  }
+
+  const description = modal.querySelector('p strong');
+  if (description) {
+    description.textContent = `"${featureName}"`;
+  }
+
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+const proFeatureDatalogger = document.getElementById('proFeatureDatalogger');
+if (proFeatureDatalogger) {
+  proFeatureDatalogger.addEventListener('click', () => {
+    showUpgradeModal('Import from Datalogger');
+  });
 }
 
 renderFitHistory();
