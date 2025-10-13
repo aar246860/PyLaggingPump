@@ -17,10 +17,18 @@
 .nowrap { white-space: nowrap; }
 
 /* MathJax containers: inline math must not become block */
-.math-inline .mjx-container { display: inline-block; vertical-align: -0.05em; }
+.math-inline { display: inline-flex; align-items: center; }
+.math-inline .mjx-container { display: inline-flex; align-items: center; vertical-align: middle; }
 
 /* Card math should wrap within container, not overflow */
-.math-block .mjx-container { max-width: 100%; }
+.math-block { overflow-x: auto; }
+.math-block .mjx-container { max-width: 100%; margin: 0 auto; display: block; text-align: center; }
+
+/* Fundamentals parameter list layout */
+.prose ul.grid { list-style: none; padding: 0; margin: 0; }
+.prose ul.grid > li { display: flex; gap: 0.75rem; align-items: flex-start; min-width: 0; }
+.prose ul.grid > li > .math-inline { flex-shrink: 0; }
+.prose ul.grid > li > .text-zinc-300 { line-height: 1.6; }
 
 /* Slightly tighter line-height for lists near math to avoid big gaps */
 .prose li { line-height: 1.55; }
