@@ -151,13 +151,14 @@ input[type="file"]::file-selector-button:hover {
 
 /* Onboarding tour contrast adjustments */
 .shepherd-element {
-  --shepherd-element-background: rgb(24, 24, 27);
-  --shepherd-element-header-background: rgb(39, 39, 42);
-  --shepherd-text-color: rgb(244, 244, 245);
-  --shepherd-title-color: rgb(244, 244, 245);
-  --shepherd-header-text-color: rgb(244, 244, 245);
-  --shepherd-element-box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
-  border: 1px solid rgba(82, 82, 91, 0.85);
+  --shepherd-element-background: rgb(17, 24, 39);
+  --shepherd-element-header-background: rgb(15, 23, 42);
+  --shepherd-text-color: rgb(226, 232, 240);
+  --shepherd-title-color: rgb(248, 250, 252);
+  --shepherd-header-text-color: rgb(226, 232, 240);
+  --shepherd-element-box-shadow: 0 25px 45px -15px rgba(2, 6, 23, 0.6),
+    0 10px 25px -12px rgba(2, 6, 23, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.4);
   border-radius: 1rem;
 }
 
@@ -165,38 +166,54 @@ input[type="file"]::file-selector-button:hover {
 .shepherd-element .shepherd-header,
 .shepherd-element .shepherd-text,
 .shepherd-element .shepherd-title {
-  color: rgb(244, 244, 245);
+  color: rgb(226, 232, 240);
 }
 
 .shepherd-element .shepherd-content {
-  background-color: rgb(24, 24, 27);
+  background-color: rgb(17, 24, 39);
 }
 
 .shepherd-element .shepherd-header {
-  background-color: rgb(39, 39, 42);
-  border-bottom: 1px solid rgba(82, 82, 91, 0.85);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(30, 41, 59, 0.9));
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.shepherd-element .shepherd-header .shepherd-title {
+  color: rgb(248, 250, 252);
+  font-weight: 700;
+  text-shadow: 0 6px 20px rgba(2, 6, 23, 0.55);
+}
+
+.shepherd-element .shepherd-text {
+  color: rgba(226, 232, 240, 0.88);
 }
 
 .shepherd-element .shepherd-button {
   border-radius: 9999px;
   font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 .shepherd-element .shepherd-button-primary {
-  background-color: rgb(99, 102, 241);
-  color: rgb(250, 250, 250);
+  background: linear-gradient(135deg, rgb(99, 102, 241), rgb(79, 70, 229));
+  color: rgb(248, 250, 252);
+  box-shadow: 0 18px 35px -15px rgba(99, 102, 241, 0.6),
+    0 10px 18px -12px rgba(99, 102, 241, 0.55);
 }
 
 .shepherd-element .shepherd-button-primary:hover {
-  background-color: rgb(79, 70, 229);
+  transform: translateY(-1px);
+  box-shadow: 0 25px 45px -18px rgba(99, 102, 241, 0.7),
+    0 16px 25px -15px rgba(99, 102, 241, 0.6);
 }
 
 .shepherd-element .shepherd-button-secondary {
-  background-color: transparent;
-  border: 1px solid rgba(82, 82, 91, 0.85);
-  color: rgb(228, 228, 231);
+  background-color: rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: rgb(226, 232, 240);
 }
 
 .shepherd-element .shepherd-button-secondary:hover {
-  background-color: rgba(82, 82, 91, 0.35);
+  background-color: rgba(148, 163, 184, 0.28);
+  border-color: rgba(148, 163, 184, 0.5);
 }
