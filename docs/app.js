@@ -489,6 +489,64 @@ if (fitBtn) {
     fitBtn.setAttribute('aria-busy', 'true');
     fitBtn.textContent = 'Parsing data…';
 
+    const trackedPyProxies = [];
+    const resultHandles = [];
+
+    const destroyTrackedProxies = (py) => {
+      if (py && py.ffi && typeof py.ffi.destroy_proxies === 'function') {
+        try {
+          py.ffi.destroy_proxies(trackedPyProxies);
+        } catch (err) {
+          console.warn('Failed to destroy Pyodide proxies via ffi:', err);
+        }
+        return;
+      }
+      for (const proxy of trackedPyProxies) {
+        if (proxy && typeof proxy.destroy === 'function') {
+          try {
+            proxy.destroy();
+          } catch (err) {
+            console.warn('Proxy destruction failed:', err);
+          }
+        }
+      }
+    };
+
+    const convertResult = (resultPy) => {
+      const local = [];
+      const converted = resultPy.toJs({ pyproxies: local, dict_converter: Object.fromEntries });
+      trackedPyProxies.push(...local);
+      return Array.isArray(converted) ? converted : [];
+    };
+
+    const populateResult = (target, fitResultArray, nBootValue, context) => {
+      const [params = {}, metrics = {}, fitted = [], ci = {}, samples = {}] = fitResultArray;
+      const { params: filteredParams, ci: filteredCi, samples: filteredSamples } = filterParamsForModel(
+        params,
+        ci,
+        currentModelMeta,
+        samples,
+      );
+      const metricsObj = metrics && typeof metrics === 'object' ? metrics : {};
+      const timesArr = Array.isArray(context?.times) ? context.times : Array.from(context?.times ?? []);
+      const drawsArr = Array.isArray(context?.draws) ? context.draws : Array.from(context?.draws ?? []);
+      target.params = filteredParams;
+      target.metrics = metricsObj;
+      target.ci = filteredCi;
+      target.samples = filteredSamples;
+      target.curves = {
+        observed: timesArr.map((t, idx) => [t, drawsArr[idx]]),
+        fitted: Array.isArray(fitted) ? fitted : [],
+      };
+      target.model = context?.model ?? 'lagging';
+      target.r = context?.radius ?? context?._r ?? null;
+      target.Q = context?.flow ?? context?._Q ?? null;
+      target.conf = typeof context?.conf === 'number' ? context.conf : Number(context?.conf ?? 0.95);
+      target.nBoot = nBootValue;
+      target.mode = 'pyodide';
+      target.modelLabel = currentModelMeta?.name || (target.model ? target.model.toUpperCase() : 'MODEL');
+    };
+
     try {
       const rValue = parseFloat(radiusInput?.value ?? 'NaN');
       const qValue = parseFloat(qInput?.value ?? 'NaN');
@@ -500,19 +558,18 @@ if (fitBtn) {
       if (!times.length) {
         throw new Error('No valid observations found.');
       }
+      const fitContext = { times, draws, model, conf, radius: _r, flow: _Q };
 
       if (statusEl) statusEl.textContent = 'Initializing Python runtime…';
       fitBtn.textContent = 'Initializing Python...';
       const py = await ensurePyodide();
-      if (statusEl) statusEl.textContent = `Running bootstrap fits (N=${nBoot})…`;
-      fitBtn.textContent = `Running bootstrap (N=${nBoot})...`;
 
       const timesProxy = py.toPy(Array.from(times));
       const drawsProxy = py.toPy(Array.from(draws));
 
       let fitPy = null;
-      let resultPy = null;
-      const pyproxies = [];
+      let quickResultPy = null;
+      let fullResultPy = null;
 
       try {
         fitPy = py.globals.get('fit_with_ci');
@@ -520,7 +577,7 @@ if (fitBtn) {
           throw new Error('fit_with_ci is not available.');
         }
         const priors = null;
-        resultPy = fitPy.callKwargs({
+        const baseKwargs = {
           times: timesProxy,
           draws: drawsProxy,
           model_name: model,
@@ -528,62 +585,76 @@ if (fitBtn) {
           Q: _Q,
           priors,
           conf,
-          n_boot: nBoot,
-        });
-        const fitResult = resultPy.toJs({ pyproxies, dict_converter: Object.fromEntries });
-        const [params = {}, metrics = {}, fitted = [], ci = {}, samples = {}] = Array.isArray(fitResult) ? fitResult : [];
-        const { params: filteredParams, ci: filteredCi, samples: filteredSamples } = filterParamsForModel(
-          params,
-          ci,
-          currentModelMeta,
-          samples,
-        );
-        const metricsObj = metrics && typeof metrics === 'object' ? metrics : {};
-        const createdAt = new Date();
-        const modelLabel = currentModelMeta?.name || model.toUpperCase();
-        const runLabel = `Fit ${fitHistory.length + 1}`;
-        const resultObj = {
-          params: filteredParams,
-          metrics: metricsObj,
-          ci: filteredCi,
-          curves: {
-            observed: times.map((t, idx) => [t, draws[idx]]),
-            fitted: Array.isArray(fitted) ? fitted : [],
-          },
-          samples: filteredSamples,
-          model,
-          r: _r,
-          Q: _Q,
-          conf,
-          nBoot,
-          mode: 'pyodide',
-          modelLabel,
-          id: `fit-${createdAt.getTime()}-${Math.random().toString(36).slice(2, 7)}`,
-          createdAt: createdAt.toISOString(),
-          selected: true,
-          runLabel,
         };
 
+        if (statusEl) statusEl.textContent = 'Computing initial fit…';
+        fitBtn.textContent = 'Computing initial fit...';
+        quickResultPy = fitPy.callKwargs({ ...baseKwargs, n_boot: 0 });
+        resultHandles.push(quickResultPy);
+        const quickResult = convertResult(quickResultPy);
+
+        const createdAt = new Date();
+        const runLabel = `Fit ${fitHistory.length + 1}`;
+        const resultObj = {
+          id: `fit-${createdAt.getTime()}-${Math.random().toString(36).slice(2, 7)}`,
+          createdAt: createdAt.toISOString(),
+          runLabel,
+          selected: true,
+        };
+        populateResult(resultObj, quickResult, 0, fitContext);
+
         window._lastFit = resultObj;
-        fitBtn.textContent = 'Processing results...';
         renderParams(resultObj);
         renderMetrics(resultObj);
         fitHistory.push(resultObj);
         renderFitHistory();
         await renderChart(getSelectedFits());
+
+        if (statusEl) statusEl.textContent = 'Calculating confidence intervals...';
+        fitBtn.textContent = 'Calculating confidence intervals...';
+
+        fullResultPy = await new Promise((resolve, reject) => {
+          setTimeout(() => {
+            try {
+              const handle = fitPy.callKwargs({ ...baseKwargs, n_boot: nBoot });
+              resolve(handle);
+            } catch (err) {
+              reject(err);
+            }
+          }, 0);
+        });
+        resultHandles.push(fullResultPy);
+        const fullResult = convertResult(fullResultPy);
+
+        populateResult(resultObj, fullResult, nBoot, fitContext);
+        window._lastFit = resultObj;
+        fitBtn.textContent = 'Processing results...';
+        renderParams(resultObj);
+        renderMetrics(resultObj);
+        renderFitHistory();
+        await renderChart(getSelectedFits());
+
         if (pdfBtn) pdfBtn.disabled = false;
-        if (statusEl) statusEl.textContent = `Fit complete. Bootstrap N=${nBoot}.`;
+        if (statusEl) statusEl.textContent = 'Fit complete.';
         fitBtn.textContent = 'Fit complete';
       } finally {
-        if (py && py.ffi && typeof py.ffi.destroy_proxies === 'function') {
-          py.ffi.destroy_proxies(pyproxies);
-        } else {
-          for (const proxy of pyproxies) {
-            if (proxy && typeof proxy.destroy === 'function') proxy.destroy();
+        destroyTrackedProxies(py);
+        for (const handle of resultHandles) {
+          if (handle && typeof handle.destroy === 'function') {
+            try {
+              handle.destroy();
+            } catch (err) {
+              console.warn('Result proxy destruction failed:', err);
+            }
           }
         }
-        if (resultPy && typeof resultPy.destroy === 'function') resultPy.destroy();
-        if (fitPy && typeof fitPy.destroy === 'function') fitPy.destroy();
+        if (fitPy && typeof fitPy.destroy === 'function') {
+          try {
+            fitPy.destroy();
+          } catch (err) {
+            console.warn('fit_with_ci proxy destruction failed:', err);
+          }
+        }
         if (timesProxy && typeof timesProxy.destroy === 'function') timesProxy.destroy();
         if (drawsProxy && typeof drawsProxy.destroy === 'function') drawsProxy.destroy();
       }
@@ -1107,6 +1178,18 @@ async function renderChart(fitsToRender = []) {
   const palette = ['#22d3ee', '#a855f7', '#f97316', '#38bdf8', '#f43f5e', '#14b8a6'];
   const bootstrapTraces = [];
   const primaryTraces = [];
+  let sampleLegendShown = false;
+
+  const computeQuantile = (sortedValues, q) => {
+    if (!Array.isArray(sortedValues) || !sortedValues.length) return Number.NaN;
+    const clamped = Math.min(Math.max(q, 0), 1);
+    const position = (sortedValues.length - 1) * clamped;
+    const lowerIndex = Math.floor(position);
+    const upperIndex = Math.ceil(position);
+    if (lowerIndex === upperIndex) return sortedValues[lowerIndex];
+    const weight = position - lowerIndex;
+    return sortedValues[lowerIndex] + (sortedValues[upperIndex] - sortedValues[lowerIndex]) * weight;
+  };
 
   const baseFit = fits[0];
   const observed = Array.isArray(baseFit?.curves?.observed) ? [...baseFit.curves.observed] : [];
@@ -1130,13 +1213,15 @@ async function renderChart(fitsToRender = []) {
     ? Object.entries(baseFit.samples)
     : [];
 
+  let confidenceBand = null;
+
   if (baseFitted.length && sampleEntries.length) {
     try {
       const validSamples = sampleEntries.filter(([, values]) => Array.isArray(values) && values.length);
       if (validSamples.length) {
         const sampleLengths = validSamples.map(([, values]) => values.length);
         const totalSamples = sampleLengths.length ? Math.max(...sampleLengths) : 0;
-        const limit = Math.min(totalSamples, 50);
+        const limit = Math.min(totalSamples, 120);
         if (limit > 0) {
           const times = baseFitted.map((d) => d[0]);
           const py = await ensurePyodide();
@@ -1146,57 +1231,100 @@ async function renderChart(fitsToRender = []) {
             console.warn(`Missing drawdown function: ${drawdownName}`);
           } else {
             const proxies = [];
+            const sampleCurves = [];
             try {
               const timeProxy = py.toPy(times);
               proxies.push(timeProxy);
+              const sampleLineLimit = 12;
               for (let idx = 0; idx < limit; idx += 1) {
                 const paramSet = {};
                 let skip = false;
                 validSamples.forEach(([key, values]) => {
-                if (skip) return;
-                if (idx >= values.length) {
-                  skip = true;
-                  return;
-                }
-                const value = values[idx];
-                if (value == null || Number.isNaN(value)) {
-                  skip = true;
-                  return;
-                }
-                paramSet[key] = Number(value);
-              });
-              if (skip) continue;
-
-              let curveProxy = null;
-              if (baseFit.model === 'theis') {
-                const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
-                const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
-                if (!Number.isFinite(Tval) || !Number.isFinite(Sval)) continue;
-                curveProxy = drawdownFunc(timeProxy, Tval, Sval, Number(baseFit.r), Number(baseFit.Q));
-              } else {
-                const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
-                const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
-                const tauQ = Number.isFinite(paramSet.tau_q) ? paramSet.tau_q : Number(baseFit.params?.tau_q);
-                const tauS = Number.isFinite(paramSet.tau_s) ? paramSet.tau_s : Number(baseFit.params?.tau_s);
-                const jVal = Number.isFinite(paramSet.j) ? paramSet.j : Number(baseFit.params?.j ?? 0);
-                if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
-                curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
-              }
-              if (!curveProxy) continue;
-              proxies.push(curveProxy);
-              const jsValues = curveProxy.toJs();
-              const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
-              if (!yValues.length) continue;
-                bootstrapTraces.push({
-                  x: times,
-                  y: yValues,
-                  mode: 'lines',
-                  type: 'scatter',
-                  line: { color: 'rgba(113, 113, 122, 0.2)', width: 1 },
-                  hoverinfo: 'skip',
-                  name: 'Bootstrap samples',
-                  showlegend: idx === 0,
+                  if (skip) return;
+                  if (idx >= values.length) {
+                    skip = true;
+                    return;
+                  }
+                  const value = values[idx];
+                  if (value == null || Number.isNaN(value)) {
+                    skip = true;
+                    return;
+                  }
+                  paramSet[key] = Number(value);
                 });
+                if (skip) continue;
+
+                let curveProxy = null;
+                if (baseFit.model === 'theis') {
+                  const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
+                  const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
+                  if (!Number.isFinite(Tval) || !Number.isFinite(Sval)) continue;
+                  curveProxy = drawdownFunc(timeProxy, Tval, Sval, Number(baseFit.r), Number(baseFit.Q));
+                } else {
+                  const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
+                  const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
+                  const tauQ = Number.isFinite(paramSet.tau_q) ? paramSet.tau_q : Number(baseFit.params?.tau_q);
+                  const tauS = Number.isFinite(paramSet.tau_s) ? paramSet.tau_s : Number(baseFit.params?.tau_s);
+                  const jVal = Number.isFinite(paramSet.j) ? paramSet.j : Number(baseFit.params?.j ?? 0);
+                  if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
+                  curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
+                }
+                if (!curveProxy) continue;
+                proxies.push(curveProxy);
+                const jsValues = curveProxy.toJs();
+                const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
+                if (!yValues.length) continue;
+                sampleCurves.push(yValues);
+                if (!sampleLegendShown) {
+                  bootstrapTraces.push({
+                    x: times,
+                    y: yValues,
+                    mode: 'lines',
+                    type: 'scatter',
+                    line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
+                    hoverinfo: 'skip',
+                    name: 'Bootstrap samples',
+                    legendgroup: 'bootstrap-samples',
+                    showlegend: true,
+                  });
+                  sampleLegendShown = true;
+                } else if (sampleCurves.length <= sampleLineLimit) {
+                  bootstrapTraces.push({
+                    x: times,
+                    y: yValues,
+                    mode: 'lines',
+                    type: 'scatter',
+                    line: { color: 'rgba(113, 113, 122, 0.18)', width: 1 },
+                    hoverinfo: 'skip',
+                    name: 'Bootstrap samples',
+                    legendgroup: 'bootstrap-samples',
+                    showlegend: false,
+                  });
+                }
+              }
+
+              if (sampleCurves.length) {
+                const confidence = Number.isFinite(baseFit?.conf) ? baseFit.conf : 0.95;
+                const lowerQuantile = Math.max(0, Math.min(1, (1 - confidence) / 2));
+                const upperQuantile = 1 - lowerQuantile;
+                const lower = [];
+                const upper = [];
+                for (let i = 0; i < times.length; i += 1) {
+                  const column = sampleCurves
+                    .map((curve) => curve[i])
+                    .filter((value) => Number.isFinite(value));
+                  if (!column.length) {
+                    lower.push(null);
+                    upper.push(null);
+                    continue;
+                  }
+                  column.sort((a, b) => a - b);
+                  lower.push(computeQuantile(column, lowerQuantile));
+                  upper.push(computeQuantile(column, upperQuantile));
+                }
+                if (lower.some((value) => Number.isFinite(value)) && upper.some((value) => Number.isFinite(value))) {
+                  confidenceBand = { times, lower, upper, confidence };
+                }
               }
             } catch (err) {
               console.warn('Bootstrap curve rendering failed:', err);
@@ -1217,6 +1345,39 @@ async function renderChart(fitsToRender = []) {
       console.warn('Unable to compute bootstrap samples:', err);
     }
   }
+
+  if (confidenceBand) {
+    const { times, lower, upper, confidence } = confidenceBand;
+    const confPercent = Math.round(Math.max(0, Math.min(1, confidence || 0.95)) * 100);
+    const bandName = `${confPercent}% CI band`;
+    const bandColor = 'rgba(56, 189, 248, 0.25)';
+    bootstrapTraces.push({
+      x: times,
+      y: lower.map((value) => (Number.isFinite(value) ? value : null)),
+      mode: 'lines',
+      type: 'scatter',
+      line: { width: 0 },
+      hoverinfo: 'skip',
+      showlegend: false,
+      fillcolor: bandColor,
+      legendgroup: 'confidence-band',
+      name: bandName,
+    });
+    bootstrapTraces.push({
+      x: times,
+      y: upper.map((value) => (Number.isFinite(value) ? value : null)),
+      mode: 'lines',
+      type: 'scatter',
+      line: { width: 0 },
+      hoverinfo: 'skip',
+      fill: 'tonexty',
+      fillcolor: bandColor,
+      showlegend: true,
+      legendgroup: 'confidence-band',
+      name: bandName,
+    });
+  }
+
 
   fits.forEach((fit, idx) => {
     const sortedFit = Array.isArray(fit.curves?.fitted) ? [...fit.curves.fitted].sort((a, b) => a[0] - b[0]) : [];

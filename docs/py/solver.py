@@ -128,7 +128,9 @@ def _lagging_s_bar(
     default to zero.
     """
 
-    p = complex(p)
+    p_arr = np.asarray(p, dtype=complex)
+    scalar_input = p_arr.ndim == 0
+
     T = float(T)
     S = float(S)
     tau_q = max(float(tau_q), 0.0)
@@ -139,19 +141,23 @@ def _lagging_s_bar(
     skin = float(Sk)
     stor = max(float(C_D), 0.0)
 
-    denom = 1.0 + tau_s * p
-    if abs(denom) < 1e-16:
-        denom = 1e-16
+    denom = 1.0 + tau_s * p_arr
+    denom = np.where(np.abs(denom) < 1e-16, 1e-16 + 0j, denom)
 
-    factor = (p + j) * (1.0 + tau_q * p) / denom
+    factor = (p_arr + j) * (1.0 + tau_q * p_arr) / denom
     diffusivity = max(T, 1e-16) / max(S, 1e-16)
     k = np.sqrt(factor / diffusivity)
     r_eval = max(float(r), rw)
 
     skin_factor = math.exp(-skin)
-    storage = 1.0 + stor * p
+    storage = 1.0 + stor * p_arr
     coeff = (Q * skin_factor) / (2.0 * math.pi * T)
-    return coeff * kv(0, k * r_eval) / (p * storage)
+    result = coeff * kv(0, k * r_eval) / (p_arr * storage)
+
+    if scalar_input:
+        return complex(result)
+
+    return result
 
 
 def _euler_accelerated_sum(b_terms: np.ndarray, order: int) -> complex:
@@ -235,22 +241,28 @@ def inv_laplace_stehfest(
     """Numerically invert ``F`` using the Gaver–Stehfest algorithm."""
 
     times = _ensure_array(t_arr)
-    coeffs = _stehfest_coefficients(int(n_terms))
+    coeffs = _stehfest_coefficients(int(n_terms)).astype(float)
     ln2 = math.log(2.0)
     out = np.zeros_like(times, dtype=float)
 
-    for idx, t in enumerate(times):
-        if t <= 0.0:
-            out[idx] = 0.0
-            continue
+    positive_mask = times > 0.0
+    if not np.any(positive_mask):
+        return out
 
-        scale = ln2 / max(float(t), EPS_TIME)
-        total = 0.0 + 0.0j
-        for k_idx, coeff in enumerate(coeffs, start=1):
-            total += coeff * F(k_idx * scale)
-        value = scale * total
-        out[idx] = float(np.real_if_close(value, tol=1000.0))
+    positive_times = times[positive_mask]
+    safe_times = np.maximum(positive_times, EPS_TIME)
+    scales = ln2 / safe_times
 
+    k_vals = np.arange(1, coeffs.size + 1, dtype=float)
+    p_matrix = np.outer(k_vals, scales)
+
+    laplace_vals = np.asarray(F(p_matrix), dtype=complex)
+    if laplace_vals.shape != p_matrix.shape:
+        laplace_vals = np.broadcast_to(laplace_vals, p_matrix.shape)
+
+    summed = laplace_vals.T @ coeffs
+    values = scales * summed
+    out[positive_mask] = np.real_if_close(values, tol=1000.0).astype(float)
     return out
 
 
@@ -270,7 +282,7 @@ def lagging_drawdown_time(
 
     times = _ensure_array(t)
 
-    def F(p: complex) -> complex:
+    def F(p):
         return _lagging_s_bar(p, r, T, S, tau_q, tau_s, Q, j=j)
 
     method_lower = method.lower()
