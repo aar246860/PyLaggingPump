@@ -226,6 +226,7 @@ input[type="file"]::file-selector-button:hover {
   color: #a1a1aa;
   transition: background-color 0.2s ease, color 0.2s ease;
   border: 1px solid transparent;
+  cursor: pointer;
 }
 .plot-scale-btn:hover {
   color: #e4e4e7;
