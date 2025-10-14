@@ -123,13 +123,13 @@ function loadSession() {
           const rValue = parseFloat(radiusInput?.value ?? 'NaN');
           const qValue = parseFloat(qInput?.value ?? 'NaN');
           const parsed = parseCsvOrText(rawInput.value, rValue, qValue);
-          updateSpatialPlot(parsed);
+          renderDataPreview(parsed);
         } catch (err) {
-          console.warn('Unable to restore spatial plot from session:', err);
-          updateSpatialPlot(null);
+          console.warn('Unable to restore data preview from session:', err);
+          renderDataPreview(null);
         }
       } else {
-        updateSpatialPlot(null);
+        renderDataPreview(null);
       }
     }
   } catch (err) {
@@ -523,10 +523,10 @@ if (exampleBtn) {
         const rValue = parseFloat(radiusInput?.value ?? 'NaN');
         const qValue = parseFloat(qInput?.value ?? 'NaN');
         const parsed = parseCsvOrText(demo, rValue, qValue);
-        updateSpatialPlot(parsed);
+        renderDataPreview(parsed);
       } catch (err) {
-        console.warn('Unable to update spatial plot from example dataset:', err);
-        updateSpatialPlot(null);
+        console.warn('Unable to update data preview from example dataset:', err);
+        renderDataPreview(null);
       }
     }
   });
@@ -545,19 +545,43 @@ if (fileInput) {
       const rValue = parseFloat(radiusInput?.value ?? 'NaN');
       const qValue = parseFloat(qInput?.value ?? 'NaN');
       const parsed = parseCsvOrText(txt, rValue, qValue);
-      updateSpatialPlot(parsed);
+      renderDataPreview(parsed);
     } catch (err) {
-      console.warn('Unable to update spatial plot from file:', err);
-      updateSpatialPlot(null);
+      console.warn('Unable to update data preview from file:', err);
+      renderDataPreview(null);
     }
   });
 }
 
-function updateSpatialPlot(parsedData) {
-  const container = $('#spatialPlotContainer');
-  if (container) {
-    const hasData = parsedData && parsedData.times && parsedData.times.length > 0;
-    container.classList.toggle('hidden', !hasData);
+async function renderDataPreview(parsedData) {
+  const container = $('#dataPreviewContainer');
+  const plotEl = $('#dataPreviewPlot');
+  if (!container || !plotEl) return;
+
+  const hasData = parsedData && parsedData.times && parsedData.times.length > 0;
+  container.classList.toggle('hidden', !hasData);
+
+  if (hasData && window.Plotly) {
+    const trace = {
+      x: parsedData.times,
+      y: parsedData.draws,
+      mode: 'lines+markers',
+      type: 'scatter',
+      marker: { color: '#94a3b8', size: 5 },
+      line: { color: '#94a3b8', width: 1.5 }
+    };
+    const layout = {
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      font: { color: '#e4e4e7', size: 10 },
+      margin: { l: 40, r: 20, t: 20, b: 30 },
+      xaxis: { gridcolor: 'rgba(113,113,122,0.2)' },
+      yaxis: { gridcolor: 'rgba(113,113,122,0.2)' }
+    };
+    const config = { responsive: true, displayModeBar: false };
+    await Plotly.newPlot(plotEl, [trace], layout, config);
+  } else if (window.Plotly) {
+    Plotly.purge(plotEl);
   }
 }
 
@@ -672,7 +696,7 @@ if (fitBtn) {
       const conf = parseFloat(confSelect?.value ?? '0.95');
       const rawText = rawInput?.value ?? '';
       const parsed = parseCsvOrText(rawText, rValue, qValue);
-      updateSpatialPlot(parsed);
+      renderDataPreview(parsed);
       const { times, draws, _r, _Q } = parsed;
       if (!times.length) {
         throw new Error('No valid observations found.');
@@ -1265,6 +1289,9 @@ async function renderChart(fitsToRender = []) {
   const showMessage = (message) => {
     if (window.Plotly) Plotly.purge(chartEl);
     chartEl.dataset.hasPlot = '0';
+    // Add flex classes back for placeholder text
+    chartEl.className = 'h-72 w-full rounded-xl border border-zinc-800/70 bg-zinc-950/40 flex items-center justify-center text-sm text-zinc-500';
+    chartEl.style.display = 'flex';
     chartEl.innerHTML = `<div class="p-6 text-center">${message}</div>`;
   };
 
@@ -1280,6 +1307,8 @@ async function renderChart(fitsToRender = []) {
   }
 
   chartEl.innerHTML = '';
+  chartEl.className = 'h-72 w-full rounded-xl border border-zinc-800/70 bg-zinc-950/40';
+  chartEl.style.display = 'block';
 
   const primaryTraces = [];
   const baseFit = fits[0];
@@ -1343,6 +1372,7 @@ async function renderChart(fitsToRender = []) {
   };
 
   await Plotly.newPlot(chartEl, primaryTraces, layout, config);
+  Plotly.Plots.resize(chartEl);
   chartEl.dataset.hasPlot = '1';
 
   if (fits.length === 1 && baseFit.samples && Object.keys(baseFit.samples).length > 0) {
@@ -1350,6 +1380,7 @@ async function renderChart(fitsToRender = []) {
       const bootstrapTraces = await calculateBootstrapTraces(baseFit);
       if (bootstrapTraces.length > 0) {
         await Plotly.addTraces(chartEl, bootstrapTraces);
+        Plotly.Plots.resize(chartEl);
       }
     } catch (err) {
       console.warn('Could not render confidence band, but showing primary plot.', err);
