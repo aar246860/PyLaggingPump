@@ -347,6 +347,8 @@ async function renderModelDetails(modelId) {
 if (modelSelect) {
   renderModelDetails(modelSelect.value);
   modelSelect.addEventListener('change', (event) => {
+    fitHistory = [];
+    renderFitHistory();
     const selected = event.target.value;
     if (selected === 'fractured') {
       showUpgradeModal('Fractured Aquifer Model');
@@ -479,24 +481,26 @@ async function ensurePyodide() {
 const exampleBtn = $('#loadExample');
 if (exampleBtn) {
   exampleBtn.addEventListener('click', () => {
-    const demo = `time_min,drawdown_m
-0.1,0.08
-0.2,0.16
-0.5,0.35
-1,0.55
-2,0.78
-4,0.95
-7,1.05
-10,1.10
-20,1.22
-40,1.38
-70,1.51
-100,1.60
-200,1.75
-400,1.90
-700,2.02
-1000,2.10
-1440,2.20`;
+    const demo = [
+      'time_min,drawdown_m',
+      '0.1,0.08',
+      '0.2,0.16',
+      '0.5,0.35',
+      '1,0.55',
+      '2,0.78',
+      '4,0.95',
+      '7,1.05',
+      '10,1.10',
+      '20,1.22',
+      '40,1.38',
+      '70,1.51',
+      '100,1.60',
+      '200,1.75',
+      '400,1.90',
+      '700,2.02',
+      '1000,2.10',
+      '1440,2.20',
+    ].join('\n');
     if (rawInput) {
       rawInput.value = demo;
       saveSession();
@@ -1383,52 +1387,47 @@ async function renderChart(fitsToRender = []) {
                     if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
                     curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
                   }
+
+                  if (!curveProxy) continue;
+                  proxies.push(curveProxy);
+                  const jsValues = curveProxy.toJs();
+                  const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
+                  if (!yValues.length) continue;
+
+                  sampleCurves.push(yValues);
+                  const plottedValues = yValues.map(sanitizeYValue);
+                  const series = filterSeriesForLogX(times, plottedValues);
+                  if (!series.x.length) continue;
+
+                  if (!sampleLegendShown) {
+                    bootstrapTraces.push({
+                      x: series.x,
+                      y: series.y,
+                      mode: 'lines',
+                      type: 'scatter',
+                      hoverinfo: 'skip',
+                      name: 'Bootstrap samples',
+                      legendgroup: 'bootstrap-samples',
+                      line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
+                      showlegend: true,
+                    });
+                    sampleLegendShown = true;
+                  } else if (sampleCurves.length <= sampleLineLimit) {
+                    bootstrapTraces.push({
+                      x: series.x,
+                      y: series.y,
+                      mode: 'lines',
+                      type: 'scatter',
+                      hoverinfo: 'skip',
+                      name: 'Bootstrap samples',
+                      legendgroup: 'bootstrap-samples',
+                      line: { color: 'rgba(113, 113, 122, 0.18)', width: 1 },
+                      showlegend: false,
+                    });
+                  }
                 } catch (err) {
                   console.error(`Bootstrap curve evaluation failed for sample index ${idx}:`, err);
-                  if (curveProxy && typeof curveProxy.destroy === 'function') {
-                    try {
-                      curveProxy.destroy();
-                    } catch (destroyErr) {
-                      console.debug('Failed to destroy curve proxy after error:', destroyErr);
-                    }
-                  }
                   continue;
-                }
-
-                if (!curveProxy) continue;
-                proxies.push(curveProxy);
-                const jsValues = curveProxy.toJs();
-                const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
-                if (!yValues.length) continue;
-                sampleCurves.push(yValues);
-            const plottedValues = yValues.map(sanitizeYValue);
-            const series = filterSeriesForLogX(times, plottedValues);
-            if (!series.x.length) continue;
-            if (!sampleLegendShown) {
-              bootstrapTraces.push({
-                x: series.x,
-                y: series.y,
-                mode: 'lines',
-                type: 'scatter',
-                line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
-                hoverinfo: 'skip',
-                name: 'Bootstrap samples',
-                legendgroup: 'bootstrap-samples',
-                showlegend: true,
-              });
-              sampleLegendShown = true;
-            } else if (sampleCurves.length <= sampleLineLimit) {
-              bootstrapTraces.push({
-                x: series.x,
-                y: series.y,
-                mode: 'lines',
-                type: 'scatter',
-                line: { color: 'rgba(113, 113, 122, 0.18)', width: 1 },
-                    hoverinfo: 'skip',
-                    name: 'Bootstrap samples',
-                    legendgroup: 'bootstrap-samples',
-                    showlegend: false,
-                  });
                 }
               }
 
@@ -1572,8 +1571,20 @@ async function renderChart(fitsToRender = []) {
     ? window.Plotly.react
     : window.Plotly.newPlot;
 
-  const handleError = (err) => {
+  const handleError = async (err) => {
     console.error('Plotly render failed:', err);
+    if (primaryTraces.length > 0) {
+      try {
+        const fallback = plotter(chartEl, primaryTraces, layout, config);
+        if (fallback && typeof fallback.then === 'function') {
+          await fallback;
+        }
+        chartEl.dataset.hasPlot = '1';
+        return;
+      } catch (fallbackErr) {
+        console.error('Fallback plot render failed:', fallbackErr);
+      }
+    }
     showMessage('Unable to render plot. Check the console for details and retry.');
   };
 
@@ -1586,7 +1597,7 @@ async function renderChart(fitsToRender = []) {
     }
     chartEl.dataset.hasPlot = '1';
   } catch (err) {
-    handleError(err);
+    await handleError(err);
   }
 }
 
