@@ -116,6 +116,22 @@ function loadSession() {
         renderModelDetails(restoredModel);
       }
     }
+    if (rawInput) {
+      const text = rawInput.value?.trim();
+      if (text) {
+        try {
+          const rValue = parseFloat(radiusInput?.value ?? 'NaN');
+          const qValue = parseFloat(qInput?.value ?? 'NaN');
+          const parsed = parseCsvOrText(rawInput.value, rValue, qValue);
+          updateSpatialPlot(parsed);
+        } catch (err) {
+          console.warn('Unable to restore spatial plot from session:', err);
+          updateSpatialPlot(null);
+        }
+      } else {
+        updateSpatialPlot(null);
+      }
+    }
   } catch (err) {
     console.warn('Unable to restore previous session:', err);
   }
@@ -481,30 +497,37 @@ async function ensurePyodide() {
 const exampleBtn = $('#loadExample');
 if (exampleBtn) {
   exampleBtn.addEventListener('click', () => {
-    const demo = [
-      'time_min,drawdown_m',
-      '0.1,0.08',
-      '0.2,0.16',
-      '0.5,0.35',
-      '1,0.55',
-      '2,0.78',
-      '4,0.95',
-      '7,1.05',
-      '10,1.10',
-      '20,1.22',
-      '40,1.38',
-      '70,1.51',
-      '100,1.60',
-      '200,1.75',
-      '400,1.90',
-      '700,2.02',
-      '1000,2.10',
-      '1440,2.20',
-    ].join('\n');
+    const demo = `time_min,drawdown_m
+0.1,0.08
+0.2,0.16
+0.5,0.35
+1,0.55
+2,0.78
+4,0.95
+7,1.05
+10,1.10
+20,1.22
+40,1.38
+70,1.51
+100,1.60
+200,1.75
+400,1.90
+700,2.02
+1000,2.10
+1440,2.20`;
     if (rawInput) {
       rawInput.value = demo;
       saveSession();
       if (statusEl) statusEl.textContent = 'Example dataset loaded. Adjust values and press “Fit model”.';
+      try {
+        const rValue = parseFloat(radiusInput?.value ?? 'NaN');
+        const qValue = parseFloat(qInput?.value ?? 'NaN');
+        const parsed = parseCsvOrText(demo, rValue, qValue);
+        updateSpatialPlot(parsed);
+      } catch (err) {
+        console.warn('Unable to update spatial plot from example dataset:', err);
+        updateSpatialPlot(null);
+      }
     }
   });
 }
@@ -518,7 +541,24 @@ if (fileInput) {
     if (rawInput) rawInput.value = txt;
     saveSession();
     if (statusEl) statusEl.textContent = `Loaded ${file.name}. Review and press “Fit model”.`;
+    try {
+      const rValue = parseFloat(radiusInput?.value ?? 'NaN');
+      const qValue = parseFloat(qInput?.value ?? 'NaN');
+      const parsed = parseCsvOrText(txt, rValue, qValue);
+      updateSpatialPlot(parsed);
+    } catch (err) {
+      console.warn('Unable to update spatial plot from file:', err);
+      updateSpatialPlot(null);
+    }
   });
+}
+
+function updateSpatialPlot(parsedData) {
+  const container = $('#spatialPlotContainer');
+  if (container) {
+    const hasData = parsedData && parsedData.times && parsedData.times.length > 0;
+    container.classList.toggle('hidden', !hasData);
+  }
 }
 
 const plotScaleButtons = document.querySelectorAll('.plot-scale-btn');
@@ -632,6 +672,7 @@ if (fitBtn) {
       const conf = parseFloat(confSelect?.value ?? '0.95');
       const rawText = rawInput?.value ?? '';
       const parsed = parseCsvOrText(rawText, rValue, qValue);
+      updateSpatialPlot(parsed);
       const { times, draws, _r, _Q } = parsed;
       if (!times.length) {
         throw new Error('No valid observations found.');
@@ -1221,323 +1262,56 @@ async function renderChart(fitsToRender = []) {
   const chartEl = $('#chart');
   if (!chartEl) return;
 
-  const pyodideReadyForBootstrap = Boolean(pyodideInstance && solverLoaded);
-  if (!pyodideReadyForBootstrap) {
-    console.warn('Pyodide not ready, skipping bootstrap curve calculation.');
-  }
-
   const showMessage = (message) => {
-    if (window.Plotly && typeof window.Plotly.purge === 'function') {
-      try {
-        window.Plotly.purge(chartEl);
-      } catch (purgeErr) {
-        console.warn('Plotly purge failed:', purgeErr);
-      }
-    }
-    delete chartEl.dataset.hasPlot;
-    chartEl.classList.add('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
-    chartEl.innerHTML = `<div class="p-6">${message}</div>`;
+    if (window.Plotly) Plotly.purge(chartEl);
+    chartEl.dataset.hasPlot = '0';
+    chartEl.innerHTML = `<div class="p-6 text-center">${message}</div>`;
   };
 
-  const hasExplicitArgument = arguments.length > 0;
-  const fits = Array.isArray(fitsToRender) ? fitsToRender.filter(Boolean) : [];
-  if (!fits.length && !hasExplicitArgument && window._lastFit) {
-    fits.push(window._lastFit);
-  }
-
+  const fits = (Array.isArray(fitsToRender) ? fitsToRender : []).filter(Boolean);
   if (!fits.length) {
-    showMessage('Observed and fitted curves will appear here after calibration.');
+    showMessage('Select a fit from the history to plot.');
     return;
   }
 
-  if (!window.Plotly || (typeof window.Plotly.newPlot !== 'function' && typeof window.Plotly.react !== 'function')) {
+  if (!window.Plotly || typeof Plotly.newPlot !== 'function') {
     showMessage('Plotting library failed to load. Refresh the page and try again.');
     return;
   }
 
-  chartEl.classList.remove('flex', 'items-center', 'justify-center', 'text-sm', 'text-zinc-500');
   chartEl.innerHTML = '';
 
-  const palette = ['#22d3ee', '#a855f7', '#f97316', '#38bdf8', '#f43f5e', '#14b8a6'];
-  const bootstrapTraces = [];
   const primaryTraces = [];
-  let sampleLegendShown = false;
-  const logXScale = currentPlotScale.includes('log');
-  const logYScale = currentPlotScale === 'log-log';
-  const isRenderablePoint = (x, y) => {
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
-    if (logXScale && x <= 0) return false;
-    if (logYScale && y <= 0) return false;
-    return true;
-  };
-  const sanitizeSeries = (series) => series.filter(([x, y]) => isRenderablePoint(x, y));
-  const sanitizeYValue = (value) => {
-    if (!Number.isFinite(value)) return null;
-    if (logYScale && value <= 0) return null;
-    return value;
-  };
-  const filterSeriesForLogX = (xValues, yValues) => {
-    if (!logXScale) {
-      return { x: xValues, y: yValues };
-    }
-    const filteredX = [];
-    const filteredY = [];
-    xValues.forEach((x, idx) => {
-      if (!Number.isFinite(x) || x <= 0) return;
-      filteredX.push(x);
-      filteredY.push(yValues[idx]);
-    });
-    return { x: filteredX, y: filteredY };
-  };
-
-  const computeQuantile = (sortedValues, q) => {
-    if (!Array.isArray(sortedValues) || !sortedValues.length) return Number.NaN;
-    const clamped = Math.min(Math.max(q, 0), 1);
-    const position = (sortedValues.length - 1) * clamped;
-    const lowerIndex = Math.floor(position);
-    const upperIndex = Math.ceil(position);
-    if (lowerIndex === upperIndex) return sortedValues[lowerIndex];
-    const weight = position - lowerIndex;
-    return sortedValues[lowerIndex] + (sortedValues[upperIndex] - sortedValues[lowerIndex]) * weight;
-  };
-
   const baseFit = fits[0];
-  const observed = Array.isArray(baseFit?.curves?.observed) ? [...baseFit.curves.observed] : [];
+  const observed = baseFit?.curves?.observed || [];
+
   if (observed.length) {
-    const sortedObs = observed.sort((a, b) => a[0] - b[0]);
-    const plottedObs = sanitizeSeries(sortedObs);
-    if (plottedObs.length) {
+    primaryTraces.push({
+      x: observed.map(d => d[0]),
+      y: observed.map(d => d[1]),
+      name: 'Observed',
+      mode: 'markers',
+      type: 'scatter',
+      marker: { color: '#94a3b8', size: 8, opacity: 0.85 },
+    });
+  }
+
+  const palette = ['#22d3ee', '#a855f7', '#f97316', '#38bdf8', '#f43f5e', '#14b8a6'];
+  fits.forEach((fit, idx) => {
+    const fitted = fit.curves?.fitted || [];
+    if (fitted.length) {
+      const color = palette[idx % palette.length];
+      const r2 = Number.isFinite(fit.metrics?.r2) ? fmtDec(fit.metrics.r2, 3) : null;
+      const legendLabel = [fit.runLabel, fit.modelLabel, r2 != null ? `R² ${r2}` : null].filter(Boolean).join(' • ');
       primaryTraces.push({
-        x: plottedObs.map((d) => d[0]),
-        y: plottedObs.map((d) => d[1]),
-        name: 'Observed',
-        mode: 'markers',
-        type: 'scatter',
-        marker: { color: '#94a3b8', size: 8, opacity: 0.85 },
-      });
-    }
-  }
-
-  const baseFitted = Array.isArray(baseFit?.curves?.fitted)
-    ? [...baseFit.curves.fitted].sort((a, b) => a[0] - b[0])
-    : [];
-
-  const sampleEntries = baseFit?.samples && typeof baseFit.samples === 'object'
-    ? Object.entries(baseFit.samples)
-    : [];
-
-  let confidenceBand = null;
-
-  if (baseFitted.length && sampleEntries.length && pyodideReadyForBootstrap) {
-    try {
-      const validSamples = sampleEntries.filter(([, values]) => Array.isArray(values) && values.length);
-      if (!validSamples.length) {
-        console.debug('No valid bootstrap samples available for rendering.');
-      } else {
-        const sampleLengths = validSamples.map(([, values]) => values.length);
-        const totalSamples = sampleLengths.length ? Math.max(...sampleLengths) : 0;
-        const limit = Math.min(totalSamples, 120);
-        if (limit <= 0) {
-          console.debug('Bootstrap sample limit resolved to zero; skipping interval rendering.');
-        } else {
-          const times = baseFitted.map((d) => d[0]);
-          const py = await ensurePyodide();
-          const drawdownName = baseFit.model === 'theis' ? 'theis_drawdown' : 'lagging_drawdown_time';
-          const drawdownFunc = py.globals.get(drawdownName);
-          if (!drawdownFunc) {
-            console.warn(`Missing drawdown function: ${drawdownName}`);
-          } else {
-            const proxies = [];
-            const sampleCurves = [];
-            try {
-              const timeProxy = py.toPy(times);
-              proxies.push(timeProxy);
-              const sampleLineLimit = 12;
-              for (let idx = 0; idx < limit; idx += 1) {
-                const paramSet = {};
-                let skip = false;
-                validSamples.forEach(([key, values]) => {
-                  if (skip) return;
-                  if (idx >= values.length) {
-                    skip = true;
-                    return;
-                  }
-                  const value = values[idx];
-                  if (value == null || Number.isNaN(value)) {
-                    skip = true;
-                    return;
-                  }
-                  paramSet[key] = Number(value);
-                });
-                if (skip) continue;
-
-                let curveProxy = null;
-                try {
-                  if (baseFit.model === 'theis') {
-                    const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
-                    const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
-                    if (!Number.isFinite(Tval) || !Number.isFinite(Sval)) continue;
-                    curveProxy = drawdownFunc(timeProxy, Tval, Sval, Number(baseFit.r), Number(baseFit.Q));
-                  } else {
-                    const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
-                    const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
-                    const tauQ = Number.isFinite(paramSet.tau_q) ? paramSet.tau_q : Number(baseFit.params?.tau_q);
-                    const tauS = Number.isFinite(paramSet.tau_s) ? paramSet.tau_s : Number(baseFit.params?.tau_s);
-                    const jVal = Number.isFinite(paramSet.j) ? paramSet.j : Number(baseFit.params?.j ?? 0);
-                    if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
-                    curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
-                  }
-
-                  if (!curveProxy) continue;
-                  proxies.push(curveProxy);
-                  const jsValues = curveProxy.toJs();
-                  const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
-                  if (!yValues.length) continue;
-
-                  sampleCurves.push(yValues);
-                  const plottedValues = yValues.map(sanitizeYValue);
-                  const series = filterSeriesForLogX(times, plottedValues);
-                  if (!series.x.length) continue;
-
-                  if (!sampleLegendShown) {
-                    bootstrapTraces.push({
-                      x: series.x,
-                      y: series.y,
-                      mode: 'lines',
-                      type: 'scatter',
-                      hoverinfo: 'skip',
-                      name: 'Bootstrap samples',
-                      legendgroup: 'bootstrap-samples',
-                      line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
-                      showlegend: true,
-                    });
-                    sampleLegendShown = true;
-                  } else if (sampleCurves.length <= sampleLineLimit) {
-                    bootstrapTraces.push({
-                      x: series.x,
-                      y: series.y,
-                      mode: 'lines',
-                      type: 'scatter',
-                      hoverinfo: 'skip',
-                      name: 'Bootstrap samples',
-                      legendgroup: 'bootstrap-samples',
-                      line: { color: 'rgba(113, 113, 122, 0.18)', width: 1 },
-                      showlegend: false,
-                    });
-                  }
-                } catch (err) {
-                  console.error(`Bootstrap curve evaluation failed for sample index ${idx}:`, err);
-                  continue;
-                }
-              }
-
-              if (sampleCurves.length) {
-                const confidence = Number.isFinite(baseFit?.conf) ? baseFit.conf : 0.95;
-                const lowerQuantile = Math.max(0, Math.min(1, (1 - confidence) / 2));
-                const upperQuantile = 1 - lowerQuantile;
-                const lower = [];
-                const upper = [];
-                for (let i = 0; i < times.length; i += 1) {
-                  if (logXScale && (!Number.isFinite(times[i]) || times[i] <= 0)) {
-                    lower.push(null);
-                    upper.push(null);
-                    continue;
-                  }
-                  const column = sampleCurves
-                    .map((curve) => curve[i])
-                    .filter((value) => Number.isFinite(value) && (!logYScale || value > 0));
-                  if (!column.length) {
-                    lower.push(null);
-                    upper.push(null);
-                    continue;
-                  }
-                  column.sort((a, b) => a - b);
-                  lower.push(computeQuantile(column, lowerQuantile));
-                  upper.push(computeQuantile(column, upperQuantile));
-                }
-                if (lower.some((value) => Number.isFinite(value)) && upper.some((value) => Number.isFinite(value))) {
-                  confidenceBand = { times, lower, upper, confidence };
-                }
-              }
-            } catch (err) {
-              console.warn('Bootstrap curve rendering failed:', err);
-            } finally {
-              proxies.forEach((proxy) => {
-                if (proxy && typeof proxy.destroy === 'function') {
-                  proxy.destroy();
-                }
-              });
-              if (drawdownFunc && typeof drawdownFunc.destroy === 'function') {
-                drawdownFunc.destroy();
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Unable to compute bootstrap samples:', err);
-    }
-  } else if (baseFitted.length && sampleEntries.length && !pyodideReadyForBootstrap) {
-    console.debug('Bootstrap samples present but Pyodide runtime is not ready; rendering without intervals.');
-  }
-
-  if (confidenceBand) {
-    const { times, lower, upper, confidence } = confidenceBand;
-    const confPercent = Math.round(Math.max(0, Math.min(1, confidence || 0.95)) * 100);
-    const bandName = `${confPercent}% CI band`;
-    const bandColor = 'rgba(56, 189, 248, 0.25)';
-    const lowerSeries = filterSeriesForLogX(times, lower.map(sanitizeYValue));
-    const upperSeries = filterSeriesForLogX(times, upper.map(sanitizeYValue));
-    if (lowerSeries.x.length) {
-      bootstrapTraces.push({
-        x: lowerSeries.x,
-        y: lowerSeries.y,
+        x: fitted.map(d => d[0]),
+        y: fitted.map(d => d[1]),
+        name: legendLabel,
         mode: 'lines',
         type: 'scatter',
-        line: { width: 0 },
-        hoverinfo: 'skip',
-        showlegend: false,
-        fillcolor: bandColor,
-        legendgroup: 'confidence-band',
-        name: bandName,
+        line: { color, width: 3 },
       });
-      if (upperSeries.x.length) {
-        bootstrapTraces.push({
-          x: upperSeries.x,
-          y: upperSeries.y,
-          mode: 'lines',
-          type: 'scatter',
-          line: { width: 0 },
-          hoverinfo: 'skip',
-          fill: 'tonexty',
-          fillcolor: bandColor,
-          showlegend: true,
-          legendgroup: 'confidence-band',
-          name: bandName,
-        });
-      }
     }
-  }
-
-
-  fits.forEach((fit, idx) => {
-    const sortedFit = Array.isArray(fit.curves?.fitted) ? [...fit.curves.fitted].sort((a, b) => a[0] - b[0]) : [];
-    const plottedFit = sanitizeSeries(sortedFit);
-    if (!plottedFit.length) return;
-    const color = palette[idx % palette.length];
-    const r2 = Number.isFinite(fit.metrics?.r2) ? fmtDec(fit.metrics.r2, 3) : null;
-    const legendLabelParts = [fit.runLabel, fit.modelLabel];
-    if (r2 != null) {
-      legendLabelParts.push(`R² ${r2}`);
-    }
-    primaryTraces.push({
-      x: plottedFit.map((d) => d[0]),
-      y: plottedFit.map((d) => d[1]),
-      name: legendLabelParts.filter(Boolean).join(' • '),
-      mode: 'lines',
-      type: 'scatter',
-      line: { color, width: 3 },
-    });
   });
 
   const layout = {
@@ -1559,6 +1333,7 @@ async function renderChart(fitsToRender = []) {
     },
     legend: { orientation: 'h', y: -0.25 },
   };
+
   const config = {
     responsive: true,
     scrollZoom: true,
@@ -1567,38 +1342,165 @@ async function renderChart(fitsToRender = []) {
     displaylogo: false,
   };
 
-  const plotter = chartEl.dataset.hasPlot === '1' && typeof window.Plotly.react === 'function'
-    ? window.Plotly.react
-    : window.Plotly.newPlot;
+  await Plotly.newPlot(chartEl, primaryTraces, layout, config);
+  chartEl.dataset.hasPlot = '1';
 
-  const handleError = async (err) => {
-    console.error('Plotly render failed:', err);
-    if (primaryTraces.length > 0) {
-      try {
-        const fallback = plotter(chartEl, primaryTraces, layout, config);
-        if (fallback && typeof fallback.then === 'function') {
-          await fallback;
-        }
-        chartEl.dataset.hasPlot = '1';
-        return;
-      } catch (fallbackErr) {
-        console.error('Fallback plot render failed:', fallbackErr);
+  if (fits.length === 1 && baseFit.samples && Object.keys(baseFit.samples).length > 0) {
+    try {
+      const bootstrapTraces = await calculateBootstrapTraces(baseFit);
+      if (bootstrapTraces.length > 0) {
+        await Plotly.addTraces(chartEl, bootstrapTraces);
       }
+    } catch (err) {
+      console.warn('Could not render confidence band, but showing primary plot.', err);
     }
-    showMessage('Unable to render plot. Check the console for details and retry.');
-  };
+  }
+}
 
-  const traces = [...bootstrapTraces, ...primaryTraces];
+async function calculateBootstrapTraces(baseFit) {
+  const pyodideReady = Boolean(pyodideInstance && solverLoaded);
+  if (!pyodideReady) {
+    console.warn('Pyodide not ready, skipping bootstrap curve calculation.');
+    return [];
+  }
+
+  const sampleEntries = Object.entries(baseFit.samples || {});
+  const baseFitted = baseFit.curves?.fitted || [];
+  const validSamples = sampleEntries.filter(([, v]) => Array.isArray(v) && v.length);
+
+  if (!baseFitted.length || !validSamples.length) return [];
+
+  const limit = Math.min(validSamples[0][1].length, 50);
+  if (limit <= 0) return [];
+
+  const times = baseFitted.map(d => d[0]);
+  const py = await ensurePyodide();
+  const drawdownName = baseFit.model === 'theis' ? 'theis_drawdown' : 'lagging_drawdown_time';
+  const drawdownFunc = py.globals.get(drawdownName);
+
+  if (!drawdownFunc) {
+    console.warn(`Missing drawdown function: ${drawdownName}`);
+    return [];
+  }
+
+  const traces = [];
+  const sampleCurves = [];
+  let sampleLegendShown = false;
+
+  const timeProxy = py.toPy(times);
 
   try {
-    const maybePromise = plotter(chartEl, traces, layout, config);
-    if (maybePromise && typeof maybePromise.then === 'function') {
-      await maybePromise;
+    for (let i = 0; i < limit; i++) {
+      const paramSet = {};
+      let skip = false;
+      for (const [key, values] of validSamples) {
+        if (i >= values.length || values[i] == null || Number.isNaN(values[i])) {
+          skip = true;
+          break;
+        }
+        paramSet[key] = Number(values[i]);
+      }
+      if (skip) continue;
+
+      let curveProxy;
+      try {
+        if (baseFit.model === 'theis') {
+          curveProxy = drawdownFunc(timeProxy, paramSet.T, paramSet.S, Number(baseFit.r), Number(baseFit.Q));
+        } else {
+          curveProxy = drawdownFunc(timeProxy, paramSet.T, paramSet.S, paramSet.tau_q, paramSet.tau_s, Number(baseFit.r), Number(baseFit.Q), paramSet.j ?? 0);
+        }
+
+        const yValues = curveProxy.toJs();
+        sampleCurves.push(Array.from(yValues));
+
+        if (!sampleLegendShown) {
+          traces.push({
+            x: times,
+            y: Array.from(yValues),
+            mode: 'lines',
+            type: 'scatter',
+            line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
+            hoverinfo: 'skip',
+            name: 'Bootstrap Samples',
+            showlegend: true,
+          });
+          sampleLegendShown = true;
+        }
+
+      } catch (e) {
+        console.warn(`Error calculating bootstrap sample ${i}:`, e);
+      } finally {
+        if (curveProxy) curveProxy.destroy();
+      }
     }
-    chartEl.dataset.hasPlot = '1';
-  } catch (err) {
-    await handleError(err);
+  } finally {
+    if (timeProxy) timeProxy.destroy();
+    if (drawdownFunc) drawdownFunc.destroy();
   }
+
+  return traces;
+}
+
+function renderParams(result) {
+  const container = $('#params');
+  if (!container) return;
+  const params = result.params || {};
+  const ci = result.ci || {};
+  const metaParams = currentModelMeta?.parameters || [];
+  const confLabel = `${Math.round((result.conf ?? 0) * 100)}% CI`;
+
+  const rows = Object.keys(params).map((key) => {
+    const meta = metaParams.find((p) => p.key === key || p.symbol === key);
+    const descriptionText = meta?.desc || meta?.description;
+    const description = descriptionText
+      ? `<div class="text-xs text-zinc-500 mt-1">${descriptionText}</div>`
+      : '';
+    const unitsLatex = typeof meta?.units === 'string' ? meta.units : '';
+    const unitsPlain = unitsLatex ? latexToPlain(unitsLatex) : '';
+    const units = unitsLatex
+      ? ` <span class="text-xs font-normal text-zinc-500 math" aria-label="${unitsPlain}">(${unitsLatex})</span>`
+      : '';
+    const labelLatex = typeof meta?.latex === 'string' ? meta.latex : meta?.symbol;
+    const labelPlain = labelLatex ? latexToPlain(labelLatex) : latexToPlain(key);
+    const label = labelLatex
+      ? `<span class="math" aria-label="${labelPlain}">${labelLatex}</span>`
+      : `<span>${labelPlain}</span>`;
+    const ciPair = Array.isArray(ci[key]) && ci[key].length === 2
+      ? `[${fmtExp(ci[key][0])}, ${fmtExp(ci[key][1])}]`
+      : '—';
+    return `
+      <tr>
+        <td class="px-4 py-3 align-top">
+          <div class="font-semibold text-zinc-100">${label}${units}</div>
+          ${description}
+        </td>
+        <td class="px-4 py-3 font-mono text-sm text-indigo-100">${fmtExp(params[key])}</td>
+        <td class="px-4 py-3 font-mono text-sm text-zinc-200">${ciPair}</td>
+      </tr>
+    `;
+  });
+
+  if (!rows.length) {
+    container.innerHTML = '<div class="p-4 text-sm text-zinc-400">Run a fit to see parameter estimates.</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="min-w-full divide-y divide-zinc-800 text-sm">
+      <thead class="bg-zinc-900/80 text-zinc-300">
+        <tr>
+          <th class="px-4 py-3 text-left font-semibold">Parameter</th>
+          <th class="px-4 py-3 text-left font-semibold">Estimate</th>
+          <th class="px-4 py-3 text-left font-semibold">${confLabel}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-zinc-800/60">
+        ${rows.join('')}
+      </tbody>
+    </table>
+  `;
+
+  typesetNow(container);
 }
 
 function initOnboardingTour() {
