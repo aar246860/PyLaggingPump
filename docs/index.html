@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Run groundwater pumping test analysis securely in your browser with Lagwell's offline-friendly explorer." />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.plot.ly https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net; connect-src 'self' https://cdn.jsdelivr.net https://cdn.plot.ly;" />
   <title>Lagwell Pump Test Explorer</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" crossorigin="anonymous" />
   <link rel="stylesheet" href="./styles.css" />
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://unpkg.com/jspdf-autotable"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@9.1.1/dist/css/shepherd.css" />
-  <script src="https://cdn.jsdelivr.net/npm/shepherd.js@9.1.1/dist/js/shepherd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@9.1.1/dist/css/shepherd.css" crossorigin="anonymous" />
+  <script src="https://cdn.jsdelivr.net/npm/shepherd.js@9.1.1/dist/js/shepherd.min.js" crossorigin="anonymous"></script>
   <script>
     window.MathJax = {
       tex: {
@@ -46,7 +48,6 @@
       <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
       <div class="flex items-center gap-4 text-sm">
         <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
-        <a href="./resources.html" class="text-zinc-300 hover:text-white transition">Resources</a>
         <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
       </div>
     </nav>
@@ -120,12 +121,12 @@
                   <input id="csvFile" type="file" accept=".csv" class="block w-full text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-indigo-500/30" />
                 </label>
                 <div class="flex items-end">
-                  <button id="loadExample" type="button" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
+                  <button id="loadExample" type="button" class="w-full sm:w-auto inline-flex items-center justify-center h-12 px-4 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
                     Load example dataset
                   </button>
                 </div>
                 <div class="sm:col-span-2">
-                  <button id="proFeatureDatalogger" type="button" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 transition">
+                  <button id="proFeatureDatalogger" type="button" class="w-full inline-flex items-center justify-center h-12 px-4 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 transition">
                     Import from Datalogger <span class="ml-2 px-2 py-0.5 text-xs font-semibold bg-indigo-500 text-white rounded-full">PRO</span>
                   </button>
                 </div>
@@ -171,7 +172,7 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-3">
-            <button id="fitBtn" class="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring focus:ring-indigo-400/60 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50">
+            <button id="fitBtn" class="inline-flex items-center justify-center h-12 px-5 rounded-lg bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring focus:ring-indigo-400/60 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50">
               Fit model
             </button>
             <p id="status" class="text-sm text-zinc-400">Waiting for data.</p>
@@ -186,7 +187,7 @@
                 Parameter estimates, confidence intervals, fit metrics, and plots appear after running the calibration.
               </p>
             </div>
-            <button id="pdfBtn" class="inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>
+            <button id="pdfBtn" class="inline-flex items-center justify-center h-12 px-5 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>
               Export PDF
             </button>
           </div>

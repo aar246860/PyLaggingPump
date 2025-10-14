@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data:; connect-src 'self' https://cdn.jsdelivr.net;" />
   <title>Lagging Model – Pump Test Explorer • Overview</title>
   <meta name="description" content="Background, equations, assumptions, and usage guide for the Lagging Model drawdown tool." />
   <meta property="og:title" content="Lagging Model Overview" />
@@ -13,8 +14,9 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="theme-color" content="#18181b" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" crossorigin="anonymous">
   <script>
     window.MathJax = {
       tex: {
@@ -41,7 +43,6 @@
       <a href="./index.html" class="text-lg font-semibold text-white">Lagwell Explorer</a>
       <div class="flex items-center gap-4 text-sm">
         <a href="./overview.html" class="text-zinc-300 hover:text-white transition">Overview</a>
-        <a href="./resources.html" class="text-zinc-300 hover:text-white transition">Resources</a>
         <a href="./pricing.html" class="text-zinc-300 hover:text-white transition">Pricing</a>
       </div>
     </nav>
@@ -57,8 +58,8 @@
           and how to use the tool.
         </p>
         <div class="mt-6 flex flex-wrap gap-3">
-          <a href="./index.html" class="px-5 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition font-semibold">Start Analyzing for Free</a>
-          <a href="#contents" class="px-5 py-3 rounded-xl border border-white/10 hover:bg-white/5 transition">Read the Technical Guide</a>
+          <a href="./index.html" class="inline-flex h-12 items-center justify-center px-5 rounded-xl bg-indigo-500 hover:bg-indigo-600 transition font-semibold">Start Analyzing for Free</a>
+          <a href="#contents" class="inline-flex h-12 items-center justify-center px-5 rounded-xl border border-white/10 hover:bg-white/5 transition">Read the Technical Guide</a>
         </div>
       </div>
       <div class="rounded-2xl border border-white/10 bg-gradient-to-b from-white/5 to-white/0 h-52 md:h-64 relative overflow-hidden">

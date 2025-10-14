@@ -15,7 +15,6 @@ class ReportRequest(BaseModel):
     conf: float = 0.95
     params: dict
     ci: dict
-    plot_base64: Optional[str] = None
     license_sn: Optional[str] = None
 
 @router.post("")

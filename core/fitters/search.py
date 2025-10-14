@@ -102,9 +102,10 @@ def fit(
     dof = max(1, len(times) - len(log_params))
     sigma2 = float(residual @ residual) / dof
     jac = result.jac
+    jtj = jac.T @ jac
     try:
-        cov_log = np.linalg.inv(jac.T @ jac) * sigma2
-    except np.linalg.LinAlgError:
+        cov_log = np.linalg.pinv(jtj, hermitian=True) * sigma2
+    except (np.linalg.LinAlgError, ValueError):
         cov_log = np.full((len(log_params), len(log_params)), np.nan)
 
     z = 1.96 if np.isclose(conf, 0.95) else float(abs(np.sqrt(2) * erfinv(conf)))
