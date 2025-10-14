@@ -217,3 +217,21 @@ input[type="file"]::file-selector-button:hover {
   background-color: rgba(148, 163, 184, 0.28);
   border-color: rgba(148, 163, 184, 0.5);
 }
+
+.plot-scale-btn {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #a1a1aa;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  border: 1px solid transparent;
+}
+.plot-scale-btn:hover {
+  color: #e4e4e7;
+}
+.plot-scale-btn.is-active {
+  background-color: #3f3f46;
+  color: #f4f4f5;
+  border-color: #52525b;
+}

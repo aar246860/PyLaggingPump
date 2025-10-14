@@ -23,6 +23,7 @@ const fitHistoryContainer = $('#fitHistory');
 const clearHistoryBtn = $('#clearHistoryBtn');
 
 let lastModelSelection = modelSelect?.value ?? 'lagging';
+let currentPlotScale = 'linear';
 
 let cachedStorage = null;
 let storageChecked = false;
@@ -354,6 +355,9 @@ if (modelSelect) {
     lastModelSelection = selected;
     renderModelDetails(selected);
     saveSession();
+    renderChart(getSelectedFits()).catch((err) => {
+      console.error('Failed to refresh chart after model change:', err);
+    });
   });
 }
 
@@ -368,7 +372,21 @@ function getModelParamKeySet(modelMeta) {
 function filterParamsForModel(rawParams, rawCi, modelMeta, rawSamples) {
   const params = rawParams && typeof rawParams === 'object' ? rawParams : {};
   const ci = rawCi && typeof rawCi === 'object' ? rawCi : {};
-  const samples = rawSamples && typeof rawSamples === 'object' ? rawSamples : {};
+  let samples = {};
+  if (rawSamples && typeof rawSamples === 'object') {
+    if (rawSamples instanceof Map) {
+      samples = Object.fromEntries(rawSamples.entries());
+    } else if (typeof rawSamples.entries === 'function' && !Array.isArray(rawSamples)) {
+      try {
+        samples = Object.fromEntries(rawSamples.entries());
+      } catch (err) {
+        console.debug('[Lagwell] Unable to convert sample entries via entries():', err);
+        samples = rawSamples;
+      }
+    } else {
+      samples = rawSamples;
+    }
+  }
   const allowed = getModelParamKeySet(modelMeta);
   if (!allowed.size) {
     return { params, ci, samples };
@@ -377,6 +395,10 @@ function filterParamsForModel(rawParams, rawCi, modelMeta, rawSamples) {
   const filteredParams = {};
   const filteredCi = {};
   const filteredSamples = {};
+  console.debug('[Lagwell] filterParamsForModel raw params:', params);
+  console.debug('[Lagwell] filterParamsForModel raw confidence intervals:', ci);
+  console.debug('[Lagwell] filterParamsForModel raw samples:', samples);
+  console.debug('[Lagwell] filterParamsForModel model metadata:', modelMeta);
   Object.keys(params).forEach((key) => {
     if (!allowed.has(key)) return;
     filteredParams[key] = params[key];
@@ -392,6 +414,7 @@ function filterParamsForModel(rawParams, rawCi, modelMeta, rawSamples) {
 
   console.debug('[Lagwell] filterParamsForModel allowed keys:', Array.from(allowed));
   console.debug('[Lagwell] filterParamsForModel filtered params:', filteredParams);
+  console.debug('[Lagwell] filterParamsForModel filtered samples:', filteredSamples);
 
   return { params: filteredParams, ci: filteredCi, samples: filteredSamples };
 }
@@ -453,7 +476,23 @@ async function ensurePyodide() {
 const exampleBtn = $('#loadExample');
 if (exampleBtn) {
   exampleBtn.addEventListener('click', () => {
-    const demo = `time_min,drawdown_m,r_m,Q_m3ph\n0.1,0.02,30,120\n0.2,0.05,30,120\n0.5,0.12,30,120\n1.0,0.18,30,120\n2.0,0.24,30,120\n3.5,0.30,30,120\n5.0,0.36,30,120`;
+    const demo = `time_min,drawdown_m,r_m,Q_m3ph
+0.1,0.02,30,120
+0.2,0.05,30,120
+0.5,0.12,30,120
+1.0,0.18,30,120
+2.0,0.24,30,120
+3.5,0.30,30,120
+5.0,0.36,30,120
+7.5,0.42,30,120
+10,0.47,30,120
+15,0.55,30,120
+20,0.61,30,120
+30,0.68,30,120
+45,0.76,30,120
+60,0.82,30,120
+90,0.90,30,120
+120,0.96,30,120`;
     if (rawInput) {
       rawInput.value = demo;
       saveSession();
@@ -471,6 +510,29 @@ if (fileInput) {
     if (rawInput) rawInput.value = txt;
     saveSession();
     if (statusEl) statusEl.textContent = `Loaded ${file.name}. Review and press “Fit model”.`;
+  });
+}
+
+const plotScaleButtons = document.querySelectorAll('.plot-scale-btn');
+if (plotScaleButtons.length) {
+  const updateActiveScaleButton = (scale) => {
+    plotScaleButtons.forEach((button) => {
+      const buttonScale = button.dataset.scale || 'linear';
+      button.classList.toggle('is-active', buttonScale === scale);
+    });
+  };
+  updateActiveScaleButton(currentPlotScale);
+
+  plotScaleButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetScale = button.dataset.scale || 'linear';
+      if (targetScale === currentPlotScale) return;
+      currentPlotScale = targetScale;
+      updateActiveScaleButton(currentPlotScale);
+      renderChart(getSelectedFits()).catch((err) => {
+        console.error('Failed to re-render chart with new scale:', err);
+      });
+    });
   });
 }
 
@@ -1143,6 +1205,11 @@ async function renderChart(fitsToRender = []) {
   const chartEl = $('#chart');
   if (!chartEl) return;
 
+  const pyodideReadyForBootstrap = Boolean(pyodideInstance && solverLoaded);
+  if (!pyodideReadyForBootstrap) {
+    console.warn('Pyodide not ready, skipping bootstrap curve calculation.');
+  }
+
   const showMessage = (message) => {
     if (window.Plotly && typeof window.Plotly.purge === 'function') {
       try {
@@ -1215,7 +1282,7 @@ async function renderChart(fitsToRender = []) {
 
   let confidenceBand = null;
 
-  if (baseFitted.length && sampleEntries.length) {
+  if (baseFitted.length && sampleEntries.length && pyodideReadyForBootstrap) {
     try {
       const validSamples = sampleEntries.filter(([, values]) => Array.isArray(values) && values.length);
       if (validSamples.length) {
@@ -1255,19 +1322,31 @@ async function renderChart(fitsToRender = []) {
                 if (skip) continue;
 
                 let curveProxy = null;
-                if (baseFit.model === 'theis') {
-                  const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
-                  const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
-                  if (!Number.isFinite(Tval) || !Number.isFinite(Sval)) continue;
-                  curveProxy = drawdownFunc(timeProxy, Tval, Sval, Number(baseFit.r), Number(baseFit.Q));
-                } else {
-                  const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
-                  const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
-                  const tauQ = Number.isFinite(paramSet.tau_q) ? paramSet.tau_q : Number(baseFit.params?.tau_q);
-                  const tauS = Number.isFinite(paramSet.tau_s) ? paramSet.tau_s : Number(baseFit.params?.tau_s);
-                  const jVal = Number.isFinite(paramSet.j) ? paramSet.j : Number(baseFit.params?.j ?? 0);
-                  if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
-                  curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
+                try {
+                  if (baseFit.model === 'theis') {
+                    const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
+                    const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
+                    if (!Number.isFinite(Tval) || !Number.isFinite(Sval)) continue;
+                    curveProxy = drawdownFunc(timeProxy, Tval, Sval, Number(baseFit.r), Number(baseFit.Q));
+                  } else {
+                    const Tval = Number.isFinite(paramSet.T) ? paramSet.T : Number(baseFit.params?.T);
+                    const Sval = Number.isFinite(paramSet.S) ? paramSet.S : Number(baseFit.params?.S);
+                    const tauQ = Number.isFinite(paramSet.tau_q) ? paramSet.tau_q : Number(baseFit.params?.tau_q);
+                    const tauS = Number.isFinite(paramSet.tau_s) ? paramSet.tau_s : Number(baseFit.params?.tau_s);
+                    const jVal = Number.isFinite(paramSet.j) ? paramSet.j : Number(baseFit.params?.j ?? 0);
+                    if (![Tval, Sval, tauQ, tauS].every(Number.isFinite)) continue;
+                    curveProxy = drawdownFunc(timeProxy, Tval, Sval, tauQ, tauS, Number(baseFit.r), Number(baseFit.Q), jVal);
+                  }
+                } catch (err) {
+                  console.error(`Bootstrap curve evaluation failed for sample index ${idx}:`, err);
+                  if (curveProxy && typeof curveProxy.destroy === 'function') {
+                    try {
+                      curveProxy.destroy();
+                    } catch (destroyErr) {
+                      console.debug('Failed to destroy curve proxy after error:', destroyErr);
+                    }
+                  }
+                  continue;
                 }
                 if (!curveProxy) continue;
                 proxies.push(curveProxy);
@@ -1344,6 +1423,8 @@ async function renderChart(fitsToRender = []) {
     } catch (err) {
       console.warn('Unable to compute bootstrap samples:', err);
     }
+  } else if (baseFitted.length && sampleEntries.length && !pyodideReadyForBootstrap) {
+    console.debug('Bootstrap samples present but Pyodide runtime is not ready; rendering without intervals.');
   }
 
   if (confidenceBand) {
@@ -1404,12 +1485,14 @@ async function renderChart(fitsToRender = []) {
     font: { color: '#e4e4e7' },
     margin: { l: 60, r: 24, t: 24, b: 48 },
     xaxis: {
-      title: 'time (min)',
+      title: { text: 'time (min)' },
+      type: currentPlotScale.includes('log') ? 'log' : 'linear',
       gridcolor: 'rgba(113,113,122,0.35)',
       zerolinecolor: 'rgba(113,113,122,0.35)',
     },
     yaxis: {
-      title: 'drawdown (m)',
+      title: { text: 'drawdown (m)' },
+      type: currentPlotScale === 'log-log' ? 'log' : 'linear',
       gridcolor: 'rgba(113,113,122,0.35)',
       zerolinecolor: 'rgba(113,113,122,0.35)',
     },
