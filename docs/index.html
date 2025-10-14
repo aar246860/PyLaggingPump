@@ -134,6 +134,14 @@
               <div id="dataPreviewContainer" class="mt-4 rounded-xl border border-zinc-800/70 bg-zinc-950/40 hidden">
                 <div class="p-4">
                   <h4 class="text-sm font-medium text-zinc-300 mb-2">Data Preview</h4>
+                  <div class="flex items-center gap-2 mb-2">
+                    <span class="text-xs font-medium text-zinc-400">Scale:</span>
+                    <div class="flex items-center rounded-lg border border-zinc-700 p-0.5 bg-zinc-800/50">
+                      <button data-scale="linear" class="preview-scale-btn is-active">Linear</button>
+                      <button data-scale="log-log" class="preview-scale-btn">Log-Log</button>
+                      <button data-scale="semi-log" class="preview-scale-btn">Semi-Log</button>
+                    </div>
+                  </div>
                   <div id="dataPreviewPlot" class="h-48 w-full bg-zinc-900 rounded-lg"></div>
                 </div>
               </div>

@@ -35,10 +35,10 @@
 }
 
 #chart {
-  min-height: 18rem;
-  display: block; /* Override flexbox centering */
+  display: block; /* Override flexbox centering to allow natural stretching */
   width: 100%;
-  height: 18rem; /* 288px, same as h-72 */
+  min-height: 18rem; /* 288px */
+  aspect-ratio: 16 / 9; /* Maintain a consistent shape */
 }
 
 #pyStatus.ready {
@@ -242,4 +242,23 @@ input[type="file"]::file-selector-button:hover {
 
 .plot-scale-btn {
   cursor: pointer;
+}
+
+.preview-scale-btn {
+  padding: 0.15rem 0.6rem;
+  border-radius: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #a1a1aa;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.preview-scale-btn:hover {
+  color: #e4e4e7;
+}
+.preview-scale-btn.is-active {
+  background-color: #3f3f46;
+  color: #f4f4f5;
+  border-color: #52525b;
 }

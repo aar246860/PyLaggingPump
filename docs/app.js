@@ -25,6 +25,7 @@ const clearHistoryBtn = $('#clearHistoryBtn');
 let lastModelSelection = modelSelect?.value ?? 'lagging';
 let lastValidModelSelection = lastModelSelection;
 let currentPlotScale = 'linear';
+let currentPreviewScale = 'linear';
 
 let cachedStorage = null;
 let storageChecked = false;
@@ -575,8 +576,16 @@ async function renderDataPreview(parsedData) {
       plot_bgcolor: 'rgba(0,0,0,0)',
       font: { color: '#e4e4e7', size: 10 },
       margin: { l: 40, r: 20, t: 20, b: 30 },
-      xaxis: { gridcolor: 'rgba(113,113,122,0.2)' },
-      yaxis: { gridcolor: 'rgba(113,113,122,0.2)' }
+      xaxis: {
+        title: { text: 'time (min)', font: { size: 10 } },
+        type: currentPreviewScale.includes('log') ? 'log' : 'linear',
+        gridcolor: 'rgba(113,113,122,0.2)'
+      },
+      yaxis: {
+        title: { text: 'drawdown (m)', font: { size: 10 } },
+        type: currentPreviewScale === 'log-log' ? 'log' : 'linear',
+        gridcolor: 'rgba(113,113,122,0.2)'
+      }
     };
     const config = { responsive: true, displayModeBar: false };
     await Plotly.newPlot(plotEl, [trace], layout, config);
@@ -605,6 +614,25 @@ if (plotScaleButtons.length) {
       renderChart(getSelectedFits()).catch((err) => {
         console.error('Failed to re-render chart with new scale:', err);
       });
+    });
+  });
+}
+
+const previewScaleButtons = document.querySelectorAll('.preview-scale-btn');
+if (previewScaleButtons.length) {
+  const updateActivePreviewButton = (scale) => {
+    previewScaleButtons.forEach((btn) => btn.classList.toggle('is-active', btn.dataset.scale === scale));
+  };
+  updateActivePreviewButton(currentPreviewScale);
+
+  previewScaleButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const targetScale = button.dataset.scale || 'linear';
+      if (targetScale === currentPreviewScale) return;
+      currentPreviewScale = targetScale;
+      updateActivePreviewButton(currentPreviewScale);
+      const parsed = parseCsvOrText(rawInput.value, NaN, NaN);
+      renderDataPreview(parsed).catch((err) => console.error('Failed to re-render preview plot:', err));
     });
   });
 }
@@ -1450,7 +1478,7 @@ async function calculateBootstrapTraces(baseFit) {
             y: Array.from(yValues),
             mode: 'lines',
             type: 'scatter',
-            line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
+            line: { color: 'rgba(79, 70, 229, 0.3)', width: 1 }, // A more visible, on-brand indigo
             hoverinfo: 'skip',
             name: 'Bootstrap Samples',
             showlegend: true,
