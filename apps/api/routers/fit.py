@@ -22,7 +22,12 @@ class FitRequest(BaseModel):
     data: List[DataPoint]
     model: Literal["lagging", "theis"] = "lagging"
     priors: Optional[Dict[str, float]] = None
-    conf: float = 0.95
+    conf: float = Field(
+        0.95,
+        gt=0.0,
+        lt=1.0,
+        description="two-sided confidence level (0-1)",
+    )
 
 
 def _coverage_buckets(times_seconds: np.ndarray) -> Dict[str, float]:
