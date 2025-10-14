@@ -52,179 +52,148 @@
       </div>
     </nav>
   </header>
+
   <div class="max-w-6xl mx-auto px-4 py-10 space-y-12">
-    <header class="space-y-6">
-      <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-        <div id="heroValue" class="space-y-4 md:max-w-3xl">
-          <p class="text-sm uppercase tracking-[0.35em] text-indigo-400/80">Lagwell</p>
-          <h1 class="text-3xl md:text-4xl font-bold leading-tight tracking-tight">Secure, Offline-Capable Pumping Test Analysis in Your Browser</h1>
-          <p class="text-lg text-zinc-300 leading-relaxed">
-            Your data never leaves your computer. Get instant, serverless pumping test analysis with the power of Python and SciPy. 100% private, secure, and ready anywhere.
-          </p>
-          <div class="pt-4 flex flex-col sm:flex-row gap-6 text-base">
-            <div class="flex items-center gap-3">
-              <svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.286Z" /></svg>
-              <span class="font-semibold">Data Security Guaranteed</span>
-            </div>
-            <div class="flex items-center gap-3">
-              <svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m3.75 13.5 10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75Z" /></svg>
-              <span class="font-semibold">Instant Results, No Uploads</span>
-            </div>
-            <div class="flex items-center gap-3">
-              <svg class="w-6 h-6 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.075c0 1.313-.964 2.508-2.316 2.752-1.351.244-2.687.116-4.002-.366a11.928 11.928 0 0 1-8.524-8.524c-.482-1.315-.61-2.651-.366-4.002 1.218-1.351 2.752-2.316 2.752-2.316m4.075 4.075 2.062-2.062m0 0-2.062-2.062M16.188 6.188l-2.062 2.062" /></svg>
-              <span class="font-semibold">Works Anywhere, Even Offline</span>
-            </div>
-          </div>
-        </div>
-        <div id="pyStatus" class="px-4 py-2 rounded-full text-sm font-medium bg-zinc-900/80 border border-zinc-800/80 text-zinc-300">
-          Python runtime not loaded
-        </div>
-      </div>
+    <header id="heroValue" class="space-y-4 md:max-w-3xl">
+      <p class="text-sm uppercase tracking-[0.35em] text-indigo-400/80">Lagwell</p>
+      <h1 class="text-3xl md:text-4xl font-bold leading-tight tracking-tight">Secure, In-Browser Pumping Test Analysis</h1>
+      <p class="text-lg text-zinc-300 leading-relaxed">
+        Your data never leaves your computer. Get instant, serverless analysis with the power of Python and SciPy. 100% private, secure, and ready anywhere.
+      </p>
     </header>
 
     <main class="space-y-10">
-      <div class="md:grid md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0">
-        <section class="rounded-2xl border border-zinc-800/60 bg-zinc-900/60 shadow-xl p-6 space-y-6">
-          <div class="space-y-2">
-            <h2 class="text-2xl font-semibold">Model &amp; data</h2>
-            <p class="text-base text-zinc-400 leading-relaxed">
-              Provide drawdown observations to calibrate the selected model. All computation runs locally via Pyodide—no uploads required.
-            </p>
-          </div>
+      <div class="md:grid md:grid-cols-2 md:gap-6 space-y-10 md:space-y-0">
+        <section class="rounded-2xl border border-zinc-800/60 bg-zinc-900/60 shadow-xl p-6 space-y-8">
 
-          <div class="space-y-8">
-            <div class="space-y-2">
-              <h2 class="text-2xl font-semibold">1. Test Configuration</h2>
-              <p class="text-base text-zinc-400 leading-relaxed">Define the physical parameters of your pumping test.</p>
+          <div class="space-y-4">
+            <div class="space-y-1">
+              <h2 class="text-xl font-semibold">1. Test Configuration</h2>
+              <p class="text-sm text-zinc-400">Define the physical parameters of the test.</p>
             </div>
             <div class="grid gap-4 sm:grid-cols-2">
               <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
                 <span>Observation radius r (m)</span>
-                <input id="r" type="number" step="0.01" value="30" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
+                <input id="r" type="number" step="0.01" value="30" class="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
               </label>
               <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
                 <span>Pumping rate Q (m³/h)</span>
-                <input id="Q" type="number" step="0.01" value="120" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
+                <input id="Q" type="number" step="0.01" value="120" class="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
               </label>
             </div>
+          </div>
 
-            <div class="border-t border-zinc-800 my-6"></div>
+          <div class="border-t border-zinc-800"></div>
 
-            <div class="space-y-2">
-              <h2 class="text-2xl font-semibold">2. Time-Drawdown Data</h2>
-              <p class="text-base text-zinc-400 leading-relaxed">Upload a CSV or paste your observation data.</p>
+          <div class="space-y-4">
+            <div class="space-y-1">
+              <h2 class="text-xl font-semibold">2. Time-Drawdown Data</h2>
+              <p class="text-sm text-zinc-400">Upload a CSV file or paste your observation data.</p>
             </div>
-            <div class="space-y-4">
-              <div class="grid gap-4 sm:grid-cols-2">
-                <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
-                  <span>CSV upload</span>
-                  <input id="csvFile" type="file" accept=".csv" class="block w-full text-sm text-zinc-200 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-indigo-500/30" />
-                </label>
-                <div class="flex items-end">
-                  <button id="loadExample" type="button" class="w-full sm:w-auto inline-flex items-center justify-center h-12 px-4 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
-                    Load example dataset
-                  </button>
-                </div>
-                <div class="sm:col-span-2">
-                  <button id="proFeatureDatalogger" type="button" class="w-full inline-flex items-center justify-center h-12 px-4 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 transition">
-                    Import from Datalogger <span class="ml-2 px-2 py-0.5 text-xs font-semibold bg-indigo-500 text-white rounded-full">PRO</span>
-                  </button>
-                </div>
+            <div class="grid gap-4 sm:grid-cols-2">
+              <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
+                <span>CSV upload</span>
+                <input id="csvFile" type="file" accept=".csv, .txt" class="block w-full text-sm text-zinc-200 file:mr-4 file:h-10 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-medium hover:file:bg-indigo-500/30" />
+              </label>
+              <div class="flex items-end">
+                <button id="loadExample" type="button" class="w-full h-10 inline-flex items-center justify-center px-4 rounded-lg border border-zinc-700 text-sm font-medium text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition">
+                  Load example data
+                </button>
               </div>
-              <textarea id="raw" rows="8" placeholder="Paste CSV with columns: time_min, drawdown_m" class="w-full rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-3 text-base text-zinc-100 font-mono focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40"></textarea>
             </div>
+            <textarea id="raw" rows="8" placeholder="Or paste CSV data here, e.g.&#10;time_min,drawdown_m&#10;0.1,0.02&#10;0.2,0.05" class="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-3 text-sm text-zinc-100 font-mono focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40"></textarea>
+          </div>
 
-            <div class="border-t border-zinc-800 my-6"></div>
+          <div class="border-t border-zinc-800"></div>
 
-            <div class="space-y-2">
-              <h2 class="text-2xl font-semibold">3. Analysis Configuration</h2>
-              <p class="text-base text-zinc-400 leading-relaxed">Select the analytical model and fit parameters.</p>
+          <div class="space-y-4">
+            <div class="space-y-1">
+              <h2 class="text-xl font-semibold">3. Analysis Configuration</h2>
+              <p class="text-sm text-zinc-400">Select the model and bootstrap parameters.</p>
             </div>
             <div class="grid gap-4 sm:grid-cols-3">
               <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
                 <span>Model</span>
-                <select id="model" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
+                <select id="model" class="h-10 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
                   <option value="lagging" selected>Lagging</option>
                   <option value="theis">Theis</option>
-                    <option value="fractured">Fractured Aquifer Model ✨ (Pro)</option>
+                  <option value="fractured" disabled>Fractured Aquifer ✨ (Pro)</option>
                 </select>
               </label>
               <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
                 <span>Confidence level</span>
-                <select id="conf" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
+                <select id="conf" class="h-10 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
                   <option value="0.95" selected>95%</option>
                   <option value="0.90">90%</option>
                 </select>
               </label>
               <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
                 <span>Bootstrap samples</span>
-                <select id="nBoot" class="rounded-lg border border-zinc-800/80 bg-zinc-950/60 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
+                <select id="nBoot" class="h-10 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40">
                   <option value="50">50</option>
                   <option value="100" selected>100</option>
                   <option value="200">200</option>
                 </select>
               </label>
             </div>
+            <div id="modelDetails" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 space-y-4 text-sm text-zinc-300 overflow-visible"></div>
           </div>
 
-          <div id="modelDetails" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 space-y-4 text-sm text-zinc-300 overflow-visible">
-            <p>Select a model to see formulas, parameters, and assumptions.</p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-3">
-            <button id="fitBtn" class="inline-flex items-center justify-center h-12 px-5 rounded-lg bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring focus:ring-indigo-400/60 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50">
-              Fit model
+          <div class="flex flex-wrap items-center gap-4 pt-4 border-t border-zinc-800">
+            <button id="fitBtn" class="inline-flex items-center justify-center h-11 px-6 rounded-lg bg-indigo-500 hover:bg-indigo-600 focus:outline-none focus:ring focus:ring-indigo-400/60 font-semibold transition disabled:cursor-not-allowed disabled:opacity-50">
+              Fit Model
             </button>
-            <p id="status" class="text-sm text-zinc-400">Waiting for data.</p>
+            <div id="pyStatus" class="px-3 py-1.5 rounded-full text-xs font-medium bg-zinc-800 border border-zinc-700 text-zinc-300">
+              Python not loaded
+            </div>
+            <p id="status" class="text-sm text-zinc-400"></p>
           </div>
         </section>
 
-        <section class="rounded-2xl border border-zinc-800/60 bg-zinc-900/60 shadow-xl p-6 space-y-6">
+        <section class="rounded-2xl border border-zinc-800/60 bg-zinc-900/60 shadow-xl p-6 space-y-8">
           <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div class="space-y-2">
-              <h2 class="text-2xl font-semibold">Results</h2>
-              <p class="text-base text-zinc-400 leading-relaxed">
-                Parameter estimates, confidence intervals, fit metrics, and plots appear after running the calibration.
-              </p>
+            <div class="space-y-1">
+              <h2 class="text-2xl font-semibold">Results Workbench</h2>
+              <p class="text-base text-zinc-400 leading-relaxed">Compare fits, inspect parameters, and export reports.</p>
             </div>
-            <button id="pdfBtn" class="inline-flex items-center justify-center h-12 px-5 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>
-              Export PDF
+            <button id="pdfBtn" class="h-11 w-full sm:w-auto inline-flex items-center justify-center px-5 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 focus:outline-none focus:ring focus:ring-zinc-600/50 transition disabled:cursor-not-allowed disabled:opacity-50" disabled>
+              Export PDF Report
             </button>
           </div>
 
-          <div class="space-y-6">
+          <div class="space-y-8">
             <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <h3 class="text-xl font-semibold">Fit History</h3>
-                <button id="clearHistoryBtn" class="px-3 py-1 rounded-md border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 transition disabled:opacity-50" disabled>Clear History</button>
-              </div>
-              <div id="fitHistory" class="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/40">
-                <div class="p-6 text-sm text-zinc-400/80 text-center">
-                  <svg class="mx-auto h-12 w-12 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12M3.75 3h16.5M3.75 3v.75A2.25 2.25 0 011.5 6v.75m19.5 0v.75a2.25 2.25 0 01-2.25 2.25h-1.5m-15 4.5h16.5a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75m16.5 4.5v8.25c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 01-1.125-1.125V10.5m16.5 4.5h.75a2.25 2.25 0 002.25-2.25V6.75a2.25 2.25 0 00-2.25-2.25H3.75" /></svg>
-                  <p class="mt-4 font-semibold">No fits yet</p>
-                  <p class="mt-1 text-zinc-500">Your analysis results will appear here.</p>
+                <div class="flex items-center justify-between">
+                    <h3 class="text-xl font-semibold">Fit History</h3>
+                    <button id="clearHistoryBtn" class="px-3 py-1 rounded-md border border-zinc-700 text-xs font-medium text-zinc-300 hover:bg-zinc-800/60 transition disabled:opacity-50" disabled>Clear History</button>
                 </div>
+                <div id="fitHistory" class="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/40">
+                    <div class="p-6 text-sm text-zinc-400/80 text-center">
+                        <svg class="mx-auto h-12 w-12 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z" /></svg>
+                        <p class="mt-4 font-semibold">No fits yet</p>
+                        <p class="mt-1 text-zinc-500">Your analysis results will appear here.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+              <h3 class="text-xl font-semibold">Plot</h3>
+              <div id="chart" class="h-80 w-full rounded-xl border border-zinc-800/70 bg-zinc-950/40 flex items-center justify-center text-sm text-zinc-500">
+                Observed vs. fitted curves will render here.
               </div>
             </div>
 
             <div class="space-y-3">
               <h3 class="text-xl font-semibold">Parameters</h3>
               <div id="params" class="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/40">
-                <div class="p-4 text-sm text-zinc-400">Run a fit to see parameter estimates.</div>
+                <div class="p-4 text-sm text-zinc-400">Parameter estimates will appear here after fitting a model.</div>
               </div>
             </div>
 
             <div class="space-y-3">
               <h3 class="text-xl font-semibold">Metrics</h3>
-              <div id="metrics" class="rounded-xl border border-zinc-800/70 bg-zinc-950/40 p-4 text-sm text-zinc-400">
-                RMSE, R², and bootstrap settings will appear here after fitting.
-              </div>
-            </div>
-
-            <div class="space-y-3">
-              <h3 class="text-xl font-semibold">Plot</h3>
-              <div id="chart" class="h-72 w-full rounded-xl border border-zinc-800/70 bg-zinc-950/40 flex items-center justify-center text-sm text-zinc-500">
-                Observed vs fitted curves will render after calibration.
+              <div id="metrics" class="p-4 text-sm text-zinc-400">
+                Fit diagnostics (RMSE, R²) will appear here.
               </div>
             </div>
           </div>
@@ -232,31 +201,19 @@
       </div>
     </main>
 
-    <section class="border border-zinc-800/60 rounded-2xl bg-zinc-900/40 p-8 space-y-6">
-      <h2 class="text-2xl font-semibold text-center">Trusted by hydrogeologists worldwide</h2>
-      <p class="text-zinc-400 text-center max-w-2xl mx-auto">Consultancies, universities, and water utilities rely on Lagwell to accelerate aquifer testing workflows without sacrificing data control.</p>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-6 opacity-70">
-        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">University Logo</div>
-        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">Consulting Firm</div>
-        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">Municipal Utility</div>
-        <div class="h-16 rounded-lg border border-dashed border-zinc-700 flex items-center justify-center text-xs uppercase tracking-widest">Research Lab</div>
-      </div>
-    </section>
-
     <footer class="text-sm text-zinc-500 text-center space-y-2 py-8 mt-12 border-t border-zinc-800">
       <p><strong>Disclaimer:</strong> This tool is for research/educational use only. Not certified for field use.</p>
       <div class="flex justify-center gap-6">
         <a href="https://github.com/aar246860/PyLaggingPump" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">GitHub Source</a>
         <a href="https://github.com/aar246860/PyLaggingPump/issues" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-300 transition">Report an Issue</a>
-        <a href="mailto:hello@example.com" class="hover:text-zinc-300 transition">Feedback &amp; Support</a>
       </div>
     </footer>
   </div>
-  <script src="./app.js"></script>
-  <div id="reportModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden items-center justify-center">
+
+  <div id="reportModal" class="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm hidden items-center justify-center">
     <div id="reportModalContent" class="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-xl w-full max-w-md p-6 m-4 space-y-4">
       <h2 class="text-2xl font-semibold">Report Settings</h2>
-      <p class="text-zinc-400">Enter the project details to include in the PDF report header.</p>
+      <p class="text-zinc-400">Enter project details to include in the PDF report header.</p>
       <div class="space-y-4 pt-2">
         <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
           <span>Project Name</span>
@@ -271,19 +228,9 @@
           <input id="reportLocation" type="text" placeholder="e.g., Site A, Well MW-1" class="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-base text-zinc-100 focus:border-indigo-400 focus:outline-none focus:ring focus:ring-indigo-400/40" />
         </label>
       </div>
-      <div class="border-t border-zinc-700 my-4"></div>
-      <div class="space-y-3 opacity-60">
-        <label class="flex flex-col gap-2 text-sm font-medium text-zinc-200">
-          <span>Your Company Logo (.png, .jpg)</span>
-          <div class="flex items-center justify-between p-2 rounded-lg border border-dashed border-zinc-600">
-            <span class="text-zinc-400">Disabled in Community Edition</span>
-            <a href="./pricing.html" class="px-3 py-1 text-xs font-semibold bg-indigo-500 text-white rounded-full hover:bg-indigo-600">UPGRADE</a>
-          </div>
-        </label>
-      </div>
       <div class="flex gap-4 pt-4">
-        <button id="cancelReportBtn" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 transition">Cancel</button>
-        <button id="generateReportBtn" class="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg bg-indigo-500 text-sm font-semibold text-white hover:bg-indigo-600 transition">Generate PDF</button>
+        <button id="cancelReportBtn" class="w-full h-11 inline-flex items-center justify-center px-4 rounded-lg border border-zinc-700 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60 transition">Cancel</button>
+        <button id="generateReportBtn" class="w-full h-11 inline-flex items-center justify-center px-4 rounded-lg bg-indigo-500 text-sm font-semibold text-white hover:bg-indigo-600 transition">Generate PDF</button>
       </div>
     </div>
   </div>
