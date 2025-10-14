@@ -23,6 +23,7 @@ const fitHistoryContainer = $('#fitHistory');
 const clearHistoryBtn = $('#clearHistoryBtn');
 
 let lastModelSelection = modelSelect?.value ?? 'lagging';
+let lastValidModelSelection = lastModelSelection;
 let currentPlotScale = 'linear';
 
 let cachedStorage = null;
@@ -194,7 +195,9 @@ document.addEventListener('DOMContentLoaded', () => {
   ensureLoadingStyles();
   loadSession();
   registerSessionListeners();
-  lastModelSelection = modelSelect?.value ?? lastModelSelection;
+  const initialModel = modelSelect?.value ?? lastModelSelection;
+  lastValidModelSelection = initialModel;
+  lastModelSelection = initialModel;
   initOnboardingTour();
 });
 
@@ -347,12 +350,12 @@ if (modelSelect) {
     const selected = event.target.value;
     if (selected === 'fractured') {
       showUpgradeModal('Fractured Aquifer Model');
-      event.target.value = lastModelSelection;
+      event.target.value = lastValidModelSelection;
       renderModelDetails(event.target.value);
       saveSession();
       return;
     }
-    lastModelSelection = selected;
+    lastValidModelSelection = selected;
     renderModelDetails(selected);
     saveSession();
     renderChart(getSelectedFits()).catch((err) => {
@@ -380,7 +383,7 @@ function filterParamsForModel(rawParams, rawCi, modelMeta, rawSamples) {
       try {
         samples = Object.fromEntries(rawSamples.entries());
       } catch (err) {
-        console.debug('[Lagwell] Unable to convert sample entries via entries():', err);
+        console.debug('Could not convert sample proxy, using as is:', err);
         samples = rawSamples;
       }
     } else {
@@ -476,23 +479,24 @@ async function ensurePyodide() {
 const exampleBtn = $('#loadExample');
 if (exampleBtn) {
   exampleBtn.addEventListener('click', () => {
-    const demo = `time_min,drawdown_m,r_m,Q_m3ph
-0.1,0.02,30,120
-0.2,0.05,30,120
-0.5,0.12,30,120
-1.0,0.18,30,120
-2.0,0.24,30,120
-3.5,0.30,30,120
-5.0,0.36,30,120
-7.5,0.42,30,120
-10,0.47,30,120
-15,0.55,30,120
-20,0.61,30,120
-30,0.68,30,120
-45,0.76,30,120
-60,0.82,30,120
-90,0.90,30,120
-120,0.96,30,120`;
+    const demo = `time_min,drawdown_m
+0.1,0.08
+0.2,0.16
+0.5,0.35
+1,0.55
+2,0.78
+4,0.95
+7,1.05
+10,1.10
+20,1.22
+40,1.38
+70,1.51
+100,1.60
+200,1.75
+400,1.90
+700,2.02
+1000,2.10
+1440,2.20`;
     if (rawInput) {
       rawInput.value = demo;
       saveSession();
@@ -521,6 +525,7 @@ if (plotScaleButtons.length) {
       button.classList.toggle('is-active', buttonScale === scale);
     });
   };
+  // Initialize button state on load
   updateActiveScaleButton(currentPlotScale);
 
   plotScaleButtons.forEach((button) => {
@@ -538,6 +543,14 @@ if (plotScaleButtons.length) {
 
 if (fitBtn) {
   fitBtn.addEventListener('click', async () => {
+    const model = modelSelect?.value ?? 'lagging';
+    if (model !== lastModelSelection) {
+      fitHistory = [];
+      window._lastFit = null;
+      renderFitHistory();
+      if (pdfBtn) pdfBtn.disabled = true;
+    }
+    lastModelSelection = model;
     ensureLoadingStyles();
     saveSession();
     if (statusEl) statusEl.textContent = 'Parsing data…';
@@ -612,7 +625,6 @@ if (fitBtn) {
     try {
       const rValue = parseFloat(radiusInput?.value ?? 'NaN');
       const qValue = parseFloat(qInput?.value ?? 'NaN');
-      const model = modelSelect?.value ?? 'lagging';
       const conf = parseFloat(confSelect?.value ?? '0.95');
       const rawText = rawInput?.value ?? '';
       const parsed = parseCsvOrText(rawText, rValue, qValue);
@@ -1246,6 +1258,33 @@ async function renderChart(fitsToRender = []) {
   const bootstrapTraces = [];
   const primaryTraces = [];
   let sampleLegendShown = false;
+  const logXScale = currentPlotScale.includes('log');
+  const logYScale = currentPlotScale === 'log-log';
+  const isRenderablePoint = (x, y) => {
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    if (logXScale && x <= 0) return false;
+    if (logYScale && y <= 0) return false;
+    return true;
+  };
+  const sanitizeSeries = (series) => series.filter(([x, y]) => isRenderablePoint(x, y));
+  const sanitizeYValue = (value) => {
+    if (!Number.isFinite(value)) return null;
+    if (logYScale && value <= 0) return null;
+    return value;
+  };
+  const filterSeriesForLogX = (xValues, yValues) => {
+    if (!logXScale) {
+      return { x: xValues, y: yValues };
+    }
+    const filteredX = [];
+    const filteredY = [];
+    xValues.forEach((x, idx) => {
+      if (!Number.isFinite(x) || x <= 0) return;
+      filteredX.push(x);
+      filteredY.push(yValues[idx]);
+    });
+    return { x: filteredX, y: filteredY };
+  };
 
   const computeQuantile = (sortedValues, q) => {
     if (!Array.isArray(sortedValues) || !sortedValues.length) return Number.NaN;
@@ -1262,14 +1301,17 @@ async function renderChart(fitsToRender = []) {
   const observed = Array.isArray(baseFit?.curves?.observed) ? [...baseFit.curves.observed] : [];
   if (observed.length) {
     const sortedObs = observed.sort((a, b) => a[0] - b[0]);
-    primaryTraces.push({
-      x: sortedObs.map((d) => d[0]),
-      y: sortedObs.map((d) => d[1]),
-      name: 'Observed',
-      mode: 'markers',
-      type: 'scatter',
-      marker: { color: '#94a3b8', size: 8, opacity: 0.85 },
-    });
+    const plottedObs = sanitizeSeries(sortedObs);
+    if (plottedObs.length) {
+      primaryTraces.push({
+        x: plottedObs.map((d) => d[0]),
+        y: plottedObs.map((d) => d[1]),
+        name: 'Observed',
+        mode: 'markers',
+        type: 'scatter',
+        marker: { color: '#94a3b8', size: 8, opacity: 0.85 },
+      });
+    }
   }
 
   const baseFitted = Array.isArray(baseFit?.curves?.fitted)
@@ -1285,11 +1327,15 @@ async function renderChart(fitsToRender = []) {
   if (baseFitted.length && sampleEntries.length && pyodideReadyForBootstrap) {
     try {
       const validSamples = sampleEntries.filter(([, values]) => Array.isArray(values) && values.length);
-      if (validSamples.length) {
+      if (!validSamples.length) {
+        console.debug('No valid bootstrap samples available for rendering.');
+      } else {
         const sampleLengths = validSamples.map(([, values]) => values.length);
         const totalSamples = sampleLengths.length ? Math.max(...sampleLengths) : 0;
         const limit = Math.min(totalSamples, 120);
-        if (limit > 0) {
+        if (limit <= 0) {
+          console.debug('Bootstrap sample limit resolved to zero; skipping interval rendering.');
+        } else {
           const times = baseFitted.map((d) => d[0]);
           const py = await ensurePyodide();
           const drawdownName = baseFit.model === 'theis' ? 'theis_drawdown' : 'lagging_drawdown_time';
@@ -1348,32 +1394,36 @@ async function renderChart(fitsToRender = []) {
                   }
                   continue;
                 }
+
                 if (!curveProxy) continue;
                 proxies.push(curveProxy);
                 const jsValues = curveProxy.toJs();
                 const yValues = Array.isArray(jsValues) ? jsValues : Array.from(jsValues ?? []);
                 if (!yValues.length) continue;
                 sampleCurves.push(yValues);
-                if (!sampleLegendShown) {
-                  bootstrapTraces.push({
-                    x: times,
-                    y: yValues,
-                    mode: 'lines',
-                    type: 'scatter',
-                    line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
-                    hoverinfo: 'skip',
-                    name: 'Bootstrap samples',
-                    legendgroup: 'bootstrap-samples',
-                    showlegend: true,
-                  });
-                  sampleLegendShown = true;
-                } else if (sampleCurves.length <= sampleLineLimit) {
-                  bootstrapTraces.push({
-                    x: times,
-                    y: yValues,
-                    mode: 'lines',
-                    type: 'scatter',
-                    line: { color: 'rgba(113, 113, 122, 0.18)', width: 1 },
+            const plottedValues = yValues.map(sanitizeYValue);
+            const series = filterSeriesForLogX(times, plottedValues);
+            if (!series.x.length) continue;
+            if (!sampleLegendShown) {
+              bootstrapTraces.push({
+                x: series.x,
+                y: series.y,
+                mode: 'lines',
+                type: 'scatter',
+                line: { color: 'rgba(113, 113, 122, 0.25)', width: 1 },
+                hoverinfo: 'skip',
+                name: 'Bootstrap samples',
+                legendgroup: 'bootstrap-samples',
+                showlegend: true,
+              });
+              sampleLegendShown = true;
+            } else if (sampleCurves.length <= sampleLineLimit) {
+              bootstrapTraces.push({
+                x: series.x,
+                y: series.y,
+                mode: 'lines',
+                type: 'scatter',
+                line: { color: 'rgba(113, 113, 122, 0.18)', width: 1 },
                     hoverinfo: 'skip',
                     name: 'Bootstrap samples',
                     legendgroup: 'bootstrap-samples',
@@ -1389,9 +1439,14 @@ async function renderChart(fitsToRender = []) {
                 const lower = [];
                 const upper = [];
                 for (let i = 0; i < times.length; i += 1) {
+                  if (logXScale && (!Number.isFinite(times[i]) || times[i] <= 0)) {
+                    lower.push(null);
+                    upper.push(null);
+                    continue;
+                  }
                   const column = sampleCurves
                     .map((curve) => curve[i])
-                    .filter((value) => Number.isFinite(value));
+                    .filter((value) => Number.isFinite(value) && (!logYScale || value > 0));
                   if (!column.length) {
                     lower.push(null);
                     upper.push(null);
@@ -1432,37 +1487,44 @@ async function renderChart(fitsToRender = []) {
     const confPercent = Math.round(Math.max(0, Math.min(1, confidence || 0.95)) * 100);
     const bandName = `${confPercent}% CI band`;
     const bandColor = 'rgba(56, 189, 248, 0.25)';
-    bootstrapTraces.push({
-      x: times,
-      y: lower.map((value) => (Number.isFinite(value) ? value : null)),
-      mode: 'lines',
-      type: 'scatter',
-      line: { width: 0 },
-      hoverinfo: 'skip',
-      showlegend: false,
-      fillcolor: bandColor,
-      legendgroup: 'confidence-band',
-      name: bandName,
-    });
-    bootstrapTraces.push({
-      x: times,
-      y: upper.map((value) => (Number.isFinite(value) ? value : null)),
-      mode: 'lines',
-      type: 'scatter',
-      line: { width: 0 },
-      hoverinfo: 'skip',
-      fill: 'tonexty',
-      fillcolor: bandColor,
-      showlegend: true,
-      legendgroup: 'confidence-band',
-      name: bandName,
-    });
+    const lowerSeries = filterSeriesForLogX(times, lower.map(sanitizeYValue));
+    const upperSeries = filterSeriesForLogX(times, upper.map(sanitizeYValue));
+    if (lowerSeries.x.length) {
+      bootstrapTraces.push({
+        x: lowerSeries.x,
+        y: lowerSeries.y,
+        mode: 'lines',
+        type: 'scatter',
+        line: { width: 0 },
+        hoverinfo: 'skip',
+        showlegend: false,
+        fillcolor: bandColor,
+        legendgroup: 'confidence-band',
+        name: bandName,
+      });
+      if (upperSeries.x.length) {
+        bootstrapTraces.push({
+          x: upperSeries.x,
+          y: upperSeries.y,
+          mode: 'lines',
+          type: 'scatter',
+          line: { width: 0 },
+          hoverinfo: 'skip',
+          fill: 'tonexty',
+          fillcolor: bandColor,
+          showlegend: true,
+          legendgroup: 'confidence-band',
+          name: bandName,
+        });
+      }
+    }
   }
 
 
   fits.forEach((fit, idx) => {
     const sortedFit = Array.isArray(fit.curves?.fitted) ? [...fit.curves.fitted].sort((a, b) => a[0] - b[0]) : [];
-    if (!sortedFit.length) return;
+    const plottedFit = sanitizeSeries(sortedFit);
+    if (!plottedFit.length) return;
     const color = palette[idx % palette.length];
     const r2 = Number.isFinite(fit.metrics?.r2) ? fmtDec(fit.metrics.r2, 3) : null;
     const legendLabelParts = [fit.runLabel, fit.modelLabel];
@@ -1470,8 +1532,8 @@ async function renderChart(fitsToRender = []) {
       legendLabelParts.push(`R² ${r2}`);
     }
     primaryTraces.push({
-      x: sortedFit.map((d) => d[0]),
-      y: sortedFit.map((d) => d[1]),
+      x: plottedFit.map((d) => d[0]),
+      y: plottedFit.map((d) => d[1]),
       name: legendLabelParts.filter(Boolean).join(' • '),
       mode: 'lines',
       type: 'scatter',
