@@ -1473,8 +1473,8 @@ async function calculateBootstrapTraces(baseFit) {
       ],
     },
     neuman: {
-      name: 'neuman_drawdown',
-      required: ['T', 'S', 'Sy', 'b'],
+      name: 'moench_drawdown',
+      required: ['T', 'S', 'Sy', 'D'],
       buildArgs: (params, base) => [
         timeProxy,
         params.T,
@@ -1482,7 +1482,7 @@ async function calculateBootstrapTraces(baseFit) {
         params.Sy,
         Number(base.r),
         Number(base.Q),
-        params.b,
+        params.D,
       ],
     },
   };
@@ -1533,7 +1533,19 @@ async function calculateBootstrapTraces(baseFit) {
           continue;
         }
 
-        curveProxy = drawdownFunc(...args);
+        if (baseFit.model === 'neuman') {
+          curveProxy = drawdownFunc(
+            timeProxy,
+            paramSet.T,
+            paramSet.S,
+            paramSet.Sy,
+            Number(baseFit.r),
+            Number(baseFit.Q),
+            paramSet.D,
+          );
+        } else {
+          curveProxy = drawdownFunc(...args);
+        }
 
         const yValues = curveProxy.toJs();
         sampleCurves.push(Array.from(yValues));

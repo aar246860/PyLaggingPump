@@ -23,7 +23,6 @@ from functools import lru_cache
 from typing import Callable, Dict, Iterable, Sequence, Tuple
 
 import numpy as np
-from scipy.integrate import quad
 from scipy.optimize import brentq, least_squares
 from scipy.special import expn, kv, j0
 
@@ -91,69 +90,60 @@ def theis_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float) -
 
 
 def hantush_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float, B: float) -> np.ndarray:
-    """Hantush (1956) solution for leaky aquifers using the Laplace domain solution
-    and the Stehfest algorithm for numerical inversion. This is fast and robust."""
-
-    times = _ensure_array(t)
-    T = float(T)
-    S = float(S)
-    r = float(r)
-    Q = float(Q)
-    B = max(float(B), 1e-12)
-
-    def F_laplace(p):
-        """Laplace-domain solution for the Hantush leakage model."""
-
-        p_arr = np.asarray(p, dtype=complex)
-        p_arr = np.where(np.abs(p_arr) < 1e-16, 1e-16 + 0j, p_arr)
-        arg = r * np.sqrt(p_arr * S / T + 1.0 / B**2)
-        s_bar = (Q / (2.0 * np.pi * T * p_arr)) * kv(0, arg)
-        return s_bar
-
-    return inv_laplace_stehfest(F_laplace, times)
-
-
-def _neuman_integrand_factory(t_val, T, S, Sy, r, b):
-    """Helper factory to create the integrand for Neuman solution."""
-
-    beta = (r**2) / (b**2)
-    sigma = S / Sy
-    td_S = (T * t_val) / (S * r**2)
-
-    def integrand(y):
-        y_sq = y**2
-
-        u_early = (1 / (4 * td_S)) * y_sq
-        w_early = expn(1, u_early)
-
-        u_late = u_early * sigma
-        w_late = expn(1, u_late)
-
-        weight = 0.5 * (1 + np.tanh(np.log(td_S / (sigma * (1 + beta * y_sq)))))
-
-        well_function = (1 - weight) * w_early + weight * w_late
-
-        return y * j0(y) * well_function
-
-    return integrand
-
-
-def neuman_drawdown(t: Sequence[float], T: float, S: float, Sy: float, r: float, Q: float, b: float) -> np.ndarray:
-    """Simplified Neuman (1972) solution for unconfined aquifers.
-    This captures the S-shape via a weighted function of two Theis curves.
+    """
+    Hantush (1956) solution for leaky aquifers using the Laplace domain solution
+    and the Stehfest algorithm for numerical inversion. This is fast and robust.
+    B is the leakage factor, often denoted as lambda or L.
     """
 
     times = _ensure_array(t)
-    s = np.zeros_like(times)
-    const = Q / (2.0 * np.pi * T)
 
-    for i, t_val in enumerate(times):
-        if t_val <= 0:
-            continue
+    def F_laplace(p):
+        """Laplace-domain solution for Hantush."""
 
-        integrand = _neuman_integrand_factory(t_val, T, S, Sy, r, b)
-        integral, _ = quad(integrand, 0, np.inf, limit=100)
-        s[i] = const * integral
+        p_arr = np.asarray(p, dtype=complex)
+        p_arr = np.where(np.abs(p_arr) < 1e-20, 1e-20 + 0j, p_arr)
+
+        arg = r * np.sqrt(S * p_arr / T + 1 / B**2)
+        s_bar = (Q / (2 * np.pi * T * p_arr)) * kv(0, arg)
+        return s_bar
+
+    # Reuse the existing, fast, vectorized Stehfest inverter
+    s = inv_laplace_stehfest(F_laplace, times)
+    return s
+
+
+def moench_drawdown(t: Sequence[float], T: float, S: float, Sy: float, r: float, Q: float, D: float) -> np.ndarray:
+    """
+    Moench (1997) solution for unconfined aquifers, which provides a good
+    approximation of the Neuman S-shaped curve and is computationally efficient.
+    D is the aquifer thickness (b).
+    """
+
+    times = _ensure_array(t)
+
+    def F_laplace(p):
+        """Laplace-domain solution for Moench."""
+
+        p_arr = np.asarray(p, dtype=complex)
+        p_arr = np.where(np.abs(p_arr) < 1e-20, 1e-20 + 0j, p_arr)
+
+        alpha = (Sy * D) / (T * S)  # A dimensionless parameter
+
+        # This complex argument captures the delayed yield effect
+        arg = r * np.sqrt(
+            (S * p_arr / T)
+            * (
+                1
+                + (alpha * Sy / (S * D * p_arr))
+                * np.tanh(np.sqrt(S * D * p_arr / (T * alpha)))
+            )
+        )
+
+        s_bar = (Q / (2 * np.pi * T * p_arr)) * kv(0, arg)
+        return s_bar
+
+    s = inv_laplace_stehfest(F_laplace, times)
     return s
 
 
@@ -360,8 +350,8 @@ def _initial_guess(model_name: str, times: np.ndarray, draws: np.ndarray):
         T0 = max(draw_span, 1e-4)
         S0 = 1e-5
         Sy0 = 0.1
-        b0 = 50.0
-        return np.log([T0, S0, Sy0, b0])
+        D0 = 50.0
+        return np.log([T0, S0, Sy0, D0])
     return np.log([T0, S0])
 
 
@@ -404,8 +394,8 @@ def fit_model(
                 pred = lagging_drawdown_time(t_arr, T, S, tau_q, tau_s, radius, rate, j_param)
                 return pred - draw_arr
 
-            j0 = priors.get('j', j_init)
-            x0 = np.array([logT0, logS0, log_tau_q0, log_tau_s0, j0])
+            j_prior = priors.get('j', j_init)
+            x0 = np.array([logT0, logS0, log_tau_q0, log_tau_s0, j_prior])
             bounds = (
                 np.array([np.log(1e-8), np.log(1e-10), np.log(1e-6), np.log(1e-6), -1.0]),
                 np.array([np.log(1e4), np.log(1.0), np.log(1e6), np.log(1e6), 1.0]),
@@ -449,9 +439,9 @@ def fit_model(
         log_params_initial = _initial_guess('neuman', times_sorted, draws_sorted)
 
         def residual(theta, t_arr, draw_arr, radius, rate):
-            logT, logS, logSy, logb = theta
-            T, S, Sy, b = np.exp([logT, logS, logSy, logb])
-            pred = neuman_drawdown(t_arr, T, S, Sy, radius, rate, b)
+            logT, logS, logSy, logD = theta
+            T, S, Sy, D = np.exp([logT, logS, logSy, logD])
+            pred = moench_drawdown(t_arr, T, S, Sy, radius, rate, D)
             return pred - draw_arr
 
         x0 = log_params_initial
@@ -534,21 +524,21 @@ def fit_model(
         }
         fitted = hantush_drawdown(times_sorted, params['T'], params['S'], r, Q, params['B'])
     elif model_name == 'neuman':
-        logT, logS, logSy, logb = result.x
+        logT, logS, logSy, logD = result.x
         params = {
             'T': float(np.exp(logT)),
             'S': float(np.exp(logS)),
             'Sy': float(np.exp(logSy)),
-            'b': float(np.exp(logb)),
+            'D': float(np.exp(logD)),
         }
-        fitted = neuman_drawdown(
+        fitted = moench_drawdown(
             times_sorted,
             params['T'],
             params['S'],
             params['Sy'],
             r,
             Q,
-            params['b'],
+            params['D'],
         )
     else:
         logT, logS = result.x
