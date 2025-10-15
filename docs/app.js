@@ -22,6 +22,19 @@ const reportLocationInput = $('#reportLocation');
 const fitHistoryContainer = $('#fitHistory');
 const clearHistoryBtn = $('#clearHistoryBtn');
 
+if (pdfBtn) {
+  pdfBtn.addEventListener('click', () => {
+    if (!window._lastFit || !window._lastFit.curves) {
+      showErrorToast('Please run a successful model fit before exporting a report.');
+      return;
+    }
+    if (reportModal) {
+      reportModal.classList.remove('hidden');
+      reportModal.classList.add('flex');
+    }
+  });
+}
+
 let lastModelSelection = modelSelect?.value ?? 'lagging';
 let lastValidModelSelection = lastModelSelection;
 let currentPlotScale = 'linear';
@@ -774,10 +787,12 @@ if (fitBtn) {
         };
         populateResult(resultObj, quickResult, 0, fitContext);
 
-        window._lastFit = resultObj;
-        renderParams(resultObj);
-        renderMetrics(resultObj);
-        fitHistory.push(resultObj);
+        const quickSnapshot = JSON.parse(JSON.stringify(resultObj));
+
+        window._lastFit = quickSnapshot;
+        fitHistory.push(quickSnapshot);
+        renderParams(quickSnapshot);
+        renderMetrics(quickSnapshot);
         renderFitHistory();
         await renderChart(getSelectedFits());
 
@@ -798,25 +813,21 @@ if (fitBtn) {
         const fullResult = convertResult(fullResultPy);
 
         populateResult(resultObj, fullResult, nBoot, fitContext);
-        window._lastFit = resultObj;
+        const finalizedSnapshot = JSON.parse(JSON.stringify(resultObj));
+        window._lastFit = finalizedSnapshot;
+        if (fitHistory.length) {
+          fitHistory[fitHistory.length - 1] = finalizedSnapshot;
+        } else {
+          fitHistory.push(finalizedSnapshot);
+        }
         fitBtn.textContent = 'Processing results...';
-        renderParams(resultObj);
-        renderMetrics(resultObj);
+        renderParams(finalizedSnapshot);
+        renderMetrics(finalizedSnapshot);
         renderFitHistory();
         await renderChart(getSelectedFits());
 
         if (pdfBtn) {
           pdfBtn.disabled = false;
-          pdfBtn.replaceWith(pdfBtn.cloneNode(true));
-          pdfBtn = $('#pdfBtn');
-          if (pdfBtn) {
-            pdfBtn.addEventListener('click', () => {
-              if (reportModal) {
-                reportModal.classList.remove('hidden');
-                reportModal.classList.add('flex');
-              }
-            });
-          }
         }
         if (statusEl) statusEl.textContent = 'Fit complete.';
         fitBtn.textContent = 'Fit complete';

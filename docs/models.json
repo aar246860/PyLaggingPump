@@ -4,9 +4,9 @@
     "name": "Theis (Confined Aquifer)",
     "formula": "\\[ s(t,r)=\\frac{Q_w}{4\\pi T} W(u),\\quad u=\\frac{Sr^2}{4 T t},\\;W(u)=E_1(u) \\]",
     "parameters": [
-      { "key": "T", "latex": "$T$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
-      { "key": "S", "latex": "$S$", "units": "$$-$$", "desc": "Storage coefficient", "estimated": true },
-      { "key": "Q_w", "latex": "$Q_w$", "units": "$$\\mathrm{m}^3/\\mathrm{day}$$", "desc": "Pumping rate (input)", "estimated": false }
+      { "key": "T", "latex": "$T$", "units": "$\\mathrm{m}^2/\\mathrm{day}$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$S$", "units": "$-$", "desc": "Storage coefficient", "estimated": true },
+      { "key": "Q_w", "latex": "$Q_w$", "units": "$\\mathrm{m}^3/\\mathrm{day}$", "desc": "Pumping rate (input)", "estimated": false }
     ],
     "assumptions": [
       "Homogeneous, isotropic, confined aquifer of infinite extent",
@@ -19,11 +19,11 @@
     "name": "Lagging Model (Lin & Yeh 2017)",
     "formula": "\\[\\begin{aligned} s(t,r) &= \\mathcal{L}^{-1}\\left\\{\\frac{Q_w}{2\\pi T}\\,\\frac{1}{p} K_0\\big(k(p)\\,r\\big)\\right\\},\\\\ k(p) &= \\sqrt{\\frac{S}{T}\\cdot\\frac{p(1+p\\,\\tau_q)}{1+p\\,\\tau_s}} \\end{aligned}\\]",
     "parameters": [
-      { "key": "T", "latex": "$T$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
-      { "key": "S", "latex": "$S$", "units": "$$-$$", "desc": "Storativity", "estimated": true },
-      { "key": "tau_q", "latex": "$\\tau_q$", "units": "$$\\text{time}$$", "desc": "Flux phase lag", "estimated": true },
-      { "key": "tau_s", "latex": "$\\tau_s$", "units": "$$\\text{time}$$", "desc": "Drawdown gradient lag", "estimated": true },
-      { "key": "Q_w", "latex": "$Q_w$", "units": "$$\\mathrm{m}^3/\\mathrm{day}$$", "desc": "Pumping rate (input)", "estimated": false }
+      { "key": "T", "latex": "$T$", "units": "$\\mathrm{m}^2/\\mathrm{day}$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$S$", "units": "$-$", "desc": "Storativity", "estimated": true },
+      { "key": "tau_q", "latex": "$\\tau_q$", "units": "$\\text{time}$", "desc": "Flux phase lag", "estimated": true },
+      { "key": "tau_s", "latex": "$\\tau_s$", "units": "$\\text{time}$", "desc": "Drawdown gradient lag", "estimated": true },
+      { "key": "Q_w", "latex": "$Q_w$", "units": "$\\mathrm{m}^3/\\mathrm{day}$", "desc": "Pumping rate (input)", "estimated": false }
     ],
     "assumptions": [
       "Phase-lagged response with skin and wellbore storage neglected",
@@ -36,9 +36,9 @@
     "name": "Hantush (Leaky Aquifer)",
     "formula": "\\[ s(t,r) = \\frac{Q}{4\\pi T} W(u, r/B) \\]",
     "parameters": [
-      { "key": "T", "latex": "$T$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
-      { "key": "S", "latex": "$S$", "units": "$$-$$", "desc": "Storage coefficient", "estimated": true },
-      { "key": "B", "latex": "$B$", "units": "$$\\mathrm{m}$$", "desc": "Leakage Factor", "estimated": true }
+      { "key": "T", "latex": "$T$", "units": "$\\mathrm{m}^2/\\mathrm{day}$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$S$", "units": "$-$", "desc": "Storage coefficient", "estimated": true },
+      { "key": "B", "latex": "$B$", "units": "$\\mathrm{m}$", "desc": "Leakage Factor", "estimated": true }
     ],
     "assumptions": [
       "Leaky confined aquifer, constant head in adjacent aquitard",
@@ -51,10 +51,10 @@
     "name": "Neuman (Unconfined Aquifer)",
     "formula": "\\[ s(t,r) = \\frac{Q}{4\\pi T} W(u_A, u_B, \\beta) \\]",
     "parameters": [
-      { "key": "T", "latex": "$T$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
-      { "key": "S", "latex": "$S$", "units": "$$-$$", "desc": "Elastic Storage (early)", "estimated": true },
-      { "key": "Sy", "latex": "$S_y$", "units": "$$-$$", "desc": "Specific Yield (late)", "estimated": true },
-      { "key": "D", "latex": "$D$", "units": "$$\\mathrm{m}$$", "desc": "Aquifer Thickness", "estimated": true }
+      { "key": "T", "latex": "$T$", "units": "$\\mathrm{m}^2/\\mathrm{day}$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$S$", "units": "$-$", "desc": "Elastic Storage (early)", "estimated": true },
+      { "key": "Sy", "latex": "$S_y$", "units": "$-$", "desc": "Specific Yield (late)", "estimated": true },
+      { "key": "D", "latex": "$D$", "units": "$\\mathrm{m}$", "desc": "Aquifer Thickness", "estimated": true }
     ],
     "assumptions": [
       "Unconfined aquifer with delayed gravity response",
