@@ -25,7 +25,7 @@ from typing import Callable, Dict, Iterable, Sequence, Tuple
 import numpy as np
 from scipy.integrate import quad
 from scipy.optimize import brentq, least_squares
-from scipy.special import expn, j0, kv
+from scipy.special import expn, kv, j0
 
 
 FOUR_PI = 4.0 * math.pi
@@ -91,10 +91,8 @@ def theis_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float) -
 
 
 def hantush_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float, B: float) -> np.ndarray:
-    """Hantush (1955) solution for leaky aquifers.
-    Uses numerical integration of the well function W(u, r/B).
-    B is the leakage factor, often denoted as lambda or L.
-    """
+    """Hantush (1956) solution for leaky aquifers using the Laplace domain solution
+    and the Stehfest algorithm for numerical inversion. This is fast and robust."""
 
     times = _ensure_array(t)
     T = float(T)
@@ -103,18 +101,16 @@ def hantush_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float,
     Q = float(Q)
     B = max(float(B), 1e-12)
 
-    u = (r**2 * S) / (4.0 * T * np.maximum(times, EPS_TIME))
-    rho = r / B
+    def F_laplace(p):
+        """Laplace-domain solution for the Hantush leakage model."""
 
-    s = np.zeros_like(times)
-    for i, u_val in enumerate(u):
-        if times[i] <= 0:
-            continue
+        p_arr = np.asarray(p, dtype=complex)
+        p_arr = np.where(np.abs(p_arr) < 1e-16, 1e-16 + 0j, p_arr)
+        arg = r * np.sqrt(p_arr * S / T + 1.0 / B**2)
+        s_bar = (Q / (2.0 * np.pi * T * p_arr)) * kv(0, arg)
+        return s_bar
 
-        integrand = lambda y: (1 / y) * np.exp(-y - (rho**2 / (4 * y)))
-        integral, _ = quad(integrand, u_val, np.inf)
-        s[i] = (Q / (FOUR_PI * T)) * integral
-    return s
+    return inv_laplace_stehfest(F_laplace, times)
 
 
 def _neuman_integrand_factory(t_val, T, S, Sy, r, b):
@@ -360,6 +356,12 @@ def _initial_guess(model_name: str, times: np.ndarray, draws: np.ndarray):
         tau_q0 = span * 0.1 + 1e-3
         tau_s0 = span * 0.25 + 1e-3
         return np.log([T0, S0, tau_q0, tau_s0]), 0.05
+    elif model_name == 'neuman':
+        T0 = max(draw_span, 1e-4)
+        S0 = 1e-5
+        Sy0 = 0.1
+        b0 = 50.0
+        return np.log([T0, S0, Sy0, b0])
     return np.log([T0, S0])
 
 
@@ -444,9 +446,7 @@ def fit_model(
         lsq_args = (times_sorted, draws_sorted, r, Q)
 
     elif model_name == 'neuman':
-        logT0, logS0 = _initial_guess('theis', times_sorted, draws_sorted)
-        Sy0 = 0.1
-        b0 = 50.0
+        log_params_initial = _initial_guess('neuman', times_sorted, draws_sorted)
 
         def residual(theta, t_arr, draw_arr, radius, rate):
             logT, logS, logSy, logb = theta
@@ -454,10 +454,10 @@ def fit_model(
             pred = neuman_drawdown(t_arr, T, S, Sy, radius, rate, b)
             return pred - draw_arr
 
-        x0 = np.array([logT0, logS0, np.log(Sy0), np.log(b0)])
+        x0 = log_params_initial
         bounds = (
-            np.array([np.log(1e-8), np.log(1e-10), np.log(1e-3), np.log(1.0)]),
-            np.array([np.log(1e4), np.log(0.1), np.log(0.5), np.log(1000.0)]),
+            np.array([np.log(1e-9), np.log(1e-12), np.log(1e-4), np.log(0.5)]),
+            np.array([np.log(1e5), np.log(0.5), np.log(0.8), np.log(2000.0)]),
         )
         lsq_args = (times_sorted, draws_sorted, r, Q)
 
