@@ -1434,11 +1434,71 @@ async function calculateBootstrapTraces(baseFit) {
 
   const times = baseFitted.map(d => d[0]);
   const py = await ensurePyodide();
-  const drawdownName = baseFit.model === 'theis' ? 'theis_drawdown' : 'lagging_drawdown_time';
-  const drawdownFunc = py.globals.get(drawdownName);
+  const drawdownConfig = {
+    theis: {
+      name: 'theis_drawdown',
+      required: ['T', 'S'],
+      buildArgs: (params, base) => [
+        timeProxy,
+        params.T,
+        params.S,
+        Number(base.r),
+        Number(base.Q),
+      ],
+    },
+    lagging: {
+      name: 'lagging_drawdown_time',
+      required: ['T', 'S', 'tau_q', 'tau_s'],
+      buildArgs: (params, base) => [
+        timeProxy,
+        params.T,
+        params.S,
+        params.tau_q,
+        params.tau_s,
+        Number(base.r),
+        Number(base.Q),
+        params.j ?? 0,
+      ],
+    },
+    hantush: {
+      name: 'hantush_drawdown',
+      required: ['T', 'S', 'B'],
+      buildArgs: (params, base) => [
+        timeProxy,
+        params.T,
+        params.S,
+        Number(base.r),
+        Number(base.Q),
+        params.B,
+      ],
+    },
+    neuman: {
+      name: 'neuman_drawdown',
+      required: ['T', 'S', 'Sy', 'b'],
+      buildArgs: (params, base) => [
+        timeProxy,
+        params.T,
+        params.S,
+        params.Sy,
+        Number(base.r),
+        Number(base.Q),
+        params.b,
+      ],
+    },
+  };
+
+  const modelKey = baseFit.model || 'lagging';
+  const modelConfig = drawdownConfig[modelKey];
+
+  if (!modelConfig) {
+    console.warn(`No drawdown configuration for model: ${modelKey}`);
+    return [];
+  }
+
+  const drawdownFunc = py.globals.get(modelConfig.name);
 
   if (!drawdownFunc) {
-    console.warn(`Missing drawdown function: ${drawdownName}`);
+    console.warn(`Missing drawdown function: ${modelConfig.name}`);
     return [];
   }
 
@@ -1463,11 +1523,17 @@ async function calculateBootstrapTraces(baseFit) {
 
       let curveProxy;
       try {
-        if (baseFit.model === 'theis') {
-          curveProxy = drawdownFunc(timeProxy, paramSet.T, paramSet.S, Number(baseFit.r), Number(baseFit.Q));
-        } else {
-          curveProxy = drawdownFunc(timeProxy, paramSet.T, paramSet.S, paramSet.tau_q, paramSet.tau_s, Number(baseFit.r), Number(baseFit.Q), paramSet.j ?? 0);
+        const missing = modelConfig.required.some((key) => !Number.isFinite(paramSet[key]));
+        if (missing) {
+          continue;
         }
+
+        const args = modelConfig.buildArgs(paramSet, baseFit);
+        if (args.some((value) => value == null || (typeof value === 'number' && Number.isNaN(value)))) {
+          continue;
+        }
+
+        curveProxy = drawdownFunc(...args);
 
         const yValues = curveProxy.toJs();
         sampleCurves.push(Array.from(yValues));
@@ -1592,7 +1658,7 @@ function initOnboardingTour() {
     {
       id: 'model',
       title: 'Choose your model',
-      text: 'Compare Theis and Lagging responses. Professional plans unlock fractured models.',
+      text: 'Compare Theis, Hantush, Neuman, and Lagging responses. Professional plans unlock fractured models.',
       attachTo: { element: '#model', on: 'bottom' },
     },
     {
