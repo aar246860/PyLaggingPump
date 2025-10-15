@@ -786,13 +786,11 @@ if (fitBtn) {
           selected: true,
         };
         populateResult(resultObj, quickResult, 0, fitContext);
-
-        const quickSnapshot = JSON.parse(JSON.stringify(resultObj));
-
-        window._lastFit = quickSnapshot;
-        fitHistory.push(quickSnapshot);
-        renderParams(quickSnapshot);
-        renderMetrics(quickSnapshot);
+        const deepCopiedResult = JSON.parse(JSON.stringify(resultObj));
+        window._lastFit = deepCopiedResult;
+        fitHistory.push(deepCopiedResult);
+        renderParams(deepCopiedResult);
+        renderMetrics(deepCopiedResult);
         renderFitHistory();
         await renderChart(getSelectedFits());
 
@@ -813,16 +811,17 @@ if (fitBtn) {
         const fullResult = convertResult(fullResultPy);
 
         populateResult(resultObj, fullResult, nBoot, fitContext);
-        const finalizedSnapshot = JSON.parse(JSON.stringify(resultObj));
-        window._lastFit = finalizedSnapshot;
-        if (fitHistory.length) {
-          fitHistory[fitHistory.length - 1] = finalizedSnapshot;
+        const finalDeepCopiedResult = JSON.parse(JSON.stringify(resultObj));
+        window._lastFit = finalDeepCopiedResult;
+        const fitIndex = fitHistory.findIndex((f) => f.id === finalDeepCopiedResult.id);
+        if (fitIndex > -1) {
+          fitHistory[fitIndex] = finalDeepCopiedResult;
         } else {
-          fitHistory.push(finalizedSnapshot);
+          fitHistory.push(finalDeepCopiedResult);
         }
         fitBtn.textContent = 'Processing results...';
-        renderParams(finalizedSnapshot);
-        renderMetrics(finalizedSnapshot);
+        renderParams(finalDeepCopiedResult);
+        renderMetrics(finalDeepCopiedResult);
         renderFitHistory();
         await renderChart(getSelectedFits());
 
