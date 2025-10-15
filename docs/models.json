@@ -30,5 +30,36 @@
       "Use for early-time delayed yield analysis",
       "Lagging formulation assumes the inertial term is neglected (j = 0)"
     ]
+  },
+  "hantush": {
+    "id": "hantush",
+    "name": "Hantush (Leaky Aquifer)",
+    "formula": "\\[ s(t,r) = \\frac{Q}{4\\pi T} W(u, r/B) \\]",
+    "parameters": [
+      { "key": "T", "latex": "$$T$$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$$S$$", "units": "$$-$$", "desc": "Storage coefficient", "estimated": true },
+      { "key": "B", "latex": "$$B$$", "units": "$$\\mathrm{m}$$", "desc": "Leakage Factor", "estimated": true }
+    ],
+    "assumptions": [
+      "Leaky confined aquifer, constant head in adjacent aquitard",
+      "Homogeneous and isotropic aquifer and aquitard",
+      "Fully penetrating well, constant pumping rate"
+    ]
+  },
+  "neuman": {
+    "id": "neuman",
+    "name": "Neuman (Unconfined Aquifer)",
+    "formula": "\\[ s(t,r) = \\frac{Q}{4\\pi T} W(u_A, u_B, \\beta) \\]",
+    "parameters": [
+      { "key": "T", "latex": "$$T$$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
+      { "key": "S", "latex": "$$S$$", "units": "$$-$$", "desc": "Elastic Storage (early)", "estimated": true },
+      { "key": "Sy", "latex": "$$S_y$$", "units": "$$-$$", "desc": "Specific Yield (late)", "estimated": true },
+      { "key": "b", "latex": "$$b$$", "units": "$$\\mathrm{m}$$", "desc": "Aquifer Thickness", "estimated": true }
+    ],
+    "assumptions": [
+      "Unconfined aquifer with delayed gravity response",
+      "Homogeneous, anisotropic aquifer of uniform thickness",
+      "Fully penetrating well"
+    ]
   }
 }
