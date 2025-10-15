@@ -23,8 +23,9 @@ from functools import lru_cache
 from typing import Callable, Dict, Iterable, Sequence, Tuple
 
 import numpy as np
-from scipy.optimize import least_squares
-from scipy.special import expn, kv
+from scipy.integrate import quad
+from scipy.optimize import brentq, least_squares
+from scipy.special import expn, j0, kv
 
 
 FOUR_PI = 4.0 * math.pi
@@ -89,22 +90,75 @@ def theis_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float) -
     return (Q / (FOUR_PI * T)) * w_u
 
 
-def hantush_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float, leakage: float) -> np.ndarray:
-    """Approximate Hantush drawdown for a leaky aquifer.
-
-    The implementation keeps the interface simple by reusing the Theis solution
-    and attenuating it with an exponential leakage factor that mimics the
-    behaviour of the exact Hantush well function.  The ``leakage`` parameter is
-    interpreted as the leakage characteristic length ``B`` (m).  When ``B`` is
-    large the solution converges towards the Theis drawdown.
+def hantush_drawdown(t: Sequence[float], T: float, S: float, r: float, Q: float, B: float) -> np.ndarray:
+    """Hantush (1955) solution for leaky aquifers.
+    Uses numerical integration of the well function W(u, r/B).
+    B is the leakage factor, often denoted as lambda or L.
     """
 
     times = _ensure_array(t)
-    base = theis_drawdown(times, T, S, r, Q)
-    B = max(float(leakage), 1e-12)
-    leakage_factor = 1.0 - np.exp(-times / B)
-    radial_decay = np.exp(-r / B)
-    return base * leakage_factor * radial_decay
+    T = float(T)
+    S = float(S)
+    r = float(r)
+    Q = float(Q)
+    B = max(float(B), 1e-12)
+
+    u = (r**2 * S) / (4.0 * T * np.maximum(times, EPS_TIME))
+    rho = r / B
+
+    s = np.zeros_like(times)
+    for i, u_val in enumerate(u):
+        if times[i] <= 0:
+            continue
+
+        integrand = lambda y: (1 / y) * np.exp(-y - (rho**2 / (4 * y)))
+        integral, _ = quad(integrand, u_val, np.inf)
+        s[i] = (Q / (FOUR_PI * T)) * integral
+    return s
+
+
+def _neuman_integrand_factory(t_val, T, S, Sy, r, b):
+    """Helper factory to create the integrand for Neuman solution."""
+
+    beta = (r**2) / (b**2)
+    sigma = S / Sy
+    td_S = (T * t_val) / (S * r**2)
+
+    def integrand(y):
+        y_sq = y**2
+
+        u_early = (1 / (4 * td_S)) * y_sq
+        w_early = expn(1, u_early)
+
+        u_late = u_early * sigma
+        w_late = expn(1, u_late)
+
+        weight = 0.5 * (1 + np.tanh(np.log(td_S / (sigma * (1 + beta * y_sq)))))
+
+        well_function = (1 - weight) * w_early + weight * w_late
+
+        return y * j0(y) * well_function
+
+    return integrand
+
+
+def neuman_drawdown(t: Sequence[float], T: float, S: float, Sy: float, r: float, Q: float, b: float) -> np.ndarray:
+    """Simplified Neuman (1972) solution for unconfined aquifers.
+    This captures the S-shape via a weighted function of two Theis curves.
+    """
+
+    times = _ensure_array(t)
+    s = np.zeros_like(times)
+    const = Q / (2.0 * np.pi * T)
+
+    for i, t_val in enumerate(times):
+        if t_val <= 0:
+            continue
+
+        integrand = _neuman_integrand_factory(t_val, T, S, Sy, r, b)
+        integral, _ = quad(integrand, 0, np.inf, limit=100)
+        s[i] = const * integral
+    return s
 
 
 def _lagging_s_bar(
@@ -372,6 +426,41 @@ def fit_model(
             )
 
         lsq_args = (times_sorted, draws_sorted, r, Q)
+    elif model_name == 'hantush':
+        logT0, logS0 = _initial_guess('theis', times_sorted, draws_sorted)
+        B0 = 500.0
+
+        def residual(theta, t_arr, draw_arr, radius, rate):
+            logT, logS, logB = theta
+            T, S, B = np.exp([logT, logS, logB])
+            pred = hantush_drawdown(t_arr, T, S, radius, rate, B)
+            return pred - draw_arr
+
+        x0 = np.array([logT0, logS0, np.log(B0)])
+        bounds = (
+            np.array([np.log(1e-8), np.log(1e-10), np.log(10.0)]),
+            np.array([np.log(1e4), np.log(1.0), np.log(5000.0)]),
+        )
+        lsq_args = (times_sorted, draws_sorted, r, Q)
+
+    elif model_name == 'neuman':
+        logT0, logS0 = _initial_guess('theis', times_sorted, draws_sorted)
+        Sy0 = 0.1
+        b0 = 50.0
+
+        def residual(theta, t_arr, draw_arr, radius, rate):
+            logT, logS, logSy, logb = theta
+            T, S, Sy, b = np.exp([logT, logS, logSy, logb])
+            pred = neuman_drawdown(t_arr, T, S, Sy, radius, rate, b)
+            return pred - draw_arr
+
+        x0 = np.array([logT0, logS0, np.log(Sy0), np.log(b0)])
+        bounds = (
+            np.array([np.log(1e-8), np.log(1e-10), np.log(1e-3), np.log(1.0)]),
+            np.array([np.log(1e4), np.log(0.1), np.log(0.5), np.log(1000.0)]),
+        )
+        lsq_args = (times_sorted, draws_sorted, r, Q)
+
     elif model_name == 'theis':
         logT0, logS0 = _initial_guess(model_name, times_sorted, draws_sorted)
 
@@ -436,6 +525,31 @@ def fit_model(
                 r,
                 Q,
             )
+    elif model_name == 'hantush':
+        logT, logS, logB = result.x
+        params = {
+            'T': float(np.exp(logT)),
+            'S': float(np.exp(logS)),
+            'B': float(np.exp(logB)),
+        }
+        fitted = hantush_drawdown(times_sorted, params['T'], params['S'], r, Q, params['B'])
+    elif model_name == 'neuman':
+        logT, logS, logSy, logb = result.x
+        params = {
+            'T': float(np.exp(logT)),
+            'S': float(np.exp(logS)),
+            'Sy': float(np.exp(logSy)),
+            'b': float(np.exp(logb)),
+        }
+        fitted = neuman_drawdown(
+            times_sorted,
+            params['T'],
+            params['S'],
+            params['Sy'],
+            r,
+            Q,
+            params['b'],
+        )
     else:
         logT, logS = result.x
         params = {
