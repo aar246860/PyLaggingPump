@@ -7,7 +7,7 @@ const modelSelect = $('#model');
 const modelDetailsEl = $('#modelDetails');
 const statusEl = $('#status');
 const fitBtn = $('#fitBtn');
-const pdfBtn = $('#pdfBtn');
+let pdfBtn = $('#pdfBtn');
 const nBootSelect = $('#nBoot');
 const radiusInput = $('#r');
 const qInput = $('#Q');
@@ -805,7 +805,19 @@ if (fitBtn) {
         renderFitHistory();
         await renderChart(getSelectedFits());
 
-        if (pdfBtn) pdfBtn.disabled = false;
+        if (pdfBtn) {
+          pdfBtn.disabled = false;
+          pdfBtn.replaceWith(pdfBtn.cloneNode(true));
+          pdfBtn = $('#pdfBtn');
+          if (pdfBtn) {
+            pdfBtn.addEventListener('click', () => {
+              if (reportModal) {
+                reportModal.classList.remove('hidden');
+                reportModal.classList.add('flex');
+              }
+            });
+          }
+        }
         if (statusEl) statusEl.textContent = 'Fit complete.';
         fitBtn.textContent = 'Fit complete';
       } finally {
@@ -839,17 +851,6 @@ if (fitBtn) {
       fitBtn.removeAttribute('aria-busy');
       const original = fitBtn.dataset.originalLabel || 'Fit model';
       fitBtn.textContent = original;
-    }
-  });
-}
-
-if (pdfBtn) {
-  pdfBtn.addEventListener('click', () => {
-    if (!reportModal) return;
-    reportModal.classList.remove('hidden');
-    reportModal.classList.add('flex');
-    if (!window._lastFit && statusEl) {
-      statusEl.textContent = 'Configure report details after running a fit to enable export.';
     }
   });
 }

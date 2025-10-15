@@ -262,3 +262,9 @@ input[type="file"]::file-selector-button:hover {
   color: #f4f4f5;
   border-color: #52525b;
 }
+
+.param-row .font-semibold > .math {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
