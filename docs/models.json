@@ -54,7 +54,7 @@
       { "key": "T", "latex": "$$T$$", "units": "$$\\mathrm{m}^2/\\mathrm{day}$$", "desc": "Transmissivity", "estimated": true },
       { "key": "S", "latex": "$$S$$", "units": "$$-$$", "desc": "Elastic Storage (early)", "estimated": true },
       { "key": "Sy", "latex": "$$S_y$$", "units": "$$-$$", "desc": "Specific Yield (late)", "estimated": true },
-      { "key": "b", "latex": "$$b$$", "units": "$$\\mathrm{m}$$", "desc": "Aquifer Thickness", "estimated": true }
+      { "key": "D", "latex": "$$D$$", "units": "$$\\mathrm{m}$$", "desc": "Aquifer Thickness", "estimated": true }
     ],
     "assumptions": [
       "Unconfined aquifer with delayed gravity response",
